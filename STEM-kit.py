@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import cv2
+import onnxruntime
 import kivy
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -11,8 +12,15 @@ from kivy.uix.image import Image
 from kivy.uix.popup import Popup
 from kivy.uix.label import Label
 from kivy.graphics.texture import Texture
+from kivy.core.window import Window
 
 kivy.require("2.0.0")
+
+# Set the position of the window
+Window.left = 100  # horizontal position
+Window.top = 500   # vertical position (distance from the top of the screen)
+
+
 class MainLayout(BoxLayout):
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
@@ -26,8 +34,8 @@ class MainLayout(BoxLayout):
             "Color Segmentation",
             "Edge Detection",
             "Text Detection",
-            "Brightness",
-            "Module 5",
+            "Object Detection",
+            "Super Resolution",
             "Module 6",
             "Module 7",
             "Module 8",
@@ -49,8 +57,10 @@ class MainLayout(BoxLayout):
             popup = CannyPopup(self)
         elif module_name == "Text Detection":
             popup = TextDetectionPopup(self)
-        elif module_name == "Brightness":
-            popup = BrightnessPopup(self)
+        elif module_name == "Object Detection":
+            popup = ObjectDetectionPopup(self)
+        elif module_name == "Super Resolution":
+            popup = SuperResolutionPopup(self)
         else:
             # Add additional modules here
             popup = UnderConstructionPopup(self)
@@ -241,7 +251,7 @@ class TextDetectionPopup(BasePopup):
 
             # Load pre-trained models.
             # East model for text-detection
-            textDetectorEAST = cv2.dnn_TextDetectionModel_EAST("./frozen_east_text_detection.pb")
+            textDetectorEAST = cv2.dnn_TextDetectionModel_EAST("./models/frozen_east_text_detection.pb")
 
             # Set the Detection Confidence Threshold and NMS threshold
             conf_thresh = self.slider.value/100.0
@@ -310,6 +320,216 @@ class TextDetectionPopup(BasePopup):
             adjusted_frame = imEAST
             texture = self.convert_frame_to_texture(adjusted_frame)
             self.image.texture = texture
+#------------------------------------------------------------------------------
+# Object Detection
+#------------------------------------------------------------------------------
+class ObjectDetectionPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Adjust Detection Threshold"
+
+        self.content = BoxLayout(orientation="vertical", spacing=40)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        # slider_layout, self.slider = self.create_labeled_slider("Brightness", 0, 100, 50)
+        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 1, 100, 60, value_format='{}%')
+
+        slider_box = BoxLayout(size_hint_y=0.05)
+        self.content.add_widget(slider_box)
+        slider_box.add_widget(slider_layout)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
+        self.INPUT_WIDTH = 640
+        self.INPUT_HEIGHT = 640
+        self.SCORE_THRESHOLD = 0.25
+        self.NMS_THRESHOLD = 0.45
+        self.CONFIDENCE_THRESHOLD = 0.45
+
+        # Text parameters.
+        self.FONT_FACE = cv2.FONT_HERSHEY_SIMPLEX
+        self.FONT_SCALE = 0.7
+        self.THICKNESS = 1
+
+        # Colors
+        self.BLACK = (0, 0, 0)
+        self.BLUE = (255, 178, 50)
+        self.YELLOW = (0, 255, 255)
+        self.RED = (0, 0, 255)
+
+        self.classes = ('classes.txt')
+
+    # Constants.
+    INPUT_WIDTH = 640
+
+
+    def draw_label(self, input_image, label, left, top):
+        """Draw text onto image at location."""
+
+        # Get text size.
+        text_size = cv2.getTextSize(label, self.FONT_FACE, self.FONT_SCALE, self.THICKNESS)
+        dim, baseline = text_size[0], text_size[1]
+        # Use text size to create a BLACK rectangle.
+        cv2.rectangle(input_image, (left, top), (left + dim[0], top + dim[1] + baseline), self.BLACK, cv2.FILLED);
+        # Display text inside the rectangle.
+        cv2.putText(input_image, label, (left, top + dim[1]), self.FONT_FACE, self.FONT_SCALE, self.YELLOW, self.THICKNESS, cv2.LINE_AA)
+
+    def preprocess(self, img):
+        img = cv2.resize(img, (self.INPUT_WIDTH, self.INPUT_HEIGHT))
+        image_data = np.array(img, dtype='float32')
+        image_data /= 255.
+        image_data = np.transpose(image_data, [2, 0, 1])
+        image_data = np.expand_dims(image_data, 0)
+        return image_data
+
+    def post_process(self, input_image, outputs):
+        # Lists to hold respective values while unwrapping.
+        class_ids = []
+        confidences = []
+        boxes = []
+
+        # Rows.
+        rows = outputs[0].shape[1]
+
+        image_height, image_width = input_image.shape[:2]
+
+        # Resizing factor.
+        x_factor = image_width / self.INPUT_WIDTH
+        y_factor = image_height / self.INPUT_HEIGHT
+
+        # Iterate through 25200 detections.
+        for r in range(rows):
+            row = outputs[0][0][r]
+            confidence = row[4]
+
+            # Discard bad detections and continue.
+            if confidence >= self.CONFIDENCE_THRESHOLD:
+                classes_scores = row[5:]
+
+                # Get the index of max class score.
+                class_id = np.argmax(classes_scores)
+
+                #  Continue if the class score is above threshold.
+                if (classes_scores[class_id] > self.SCORE_THRESHOLD):
+                    confidences.append(confidence)
+                    class_ids.append(class_id)
+
+                    cx, cy, w, h = row[0], row[1], row[2], row[3]
+
+                    left = int((cx - w / 2) * x_factor)
+                    top = int((cy - h / 2) * y_factor)
+                    width = int(w * x_factor)
+                    height = int(h * y_factor)
+
+                    # box = np.array([left, top, width, height]) \
+                    box = [left, top, width, height]
+                    boxes.append(box)
+
+        # Perform non-maximum suppression to eliminate redundant overlapping boxes with
+        # lower confidences.
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, self.CONFIDENCE_THRESHOLD, self.NMS_THRESHOLD)
+        for i in indices:
+            box = boxes[i]
+            left = box[0]
+            top = box[1]
+            width = box[2]
+            height = box[3]
+            cv2.rectangle(input_image, (left, top), (left + width, top + height), self.BLUE, 3 * self.THICKNESS)
+
+            print("i:", i)
+            print("class_ids:", class_ids)
+            print("len(self.classes):", len(self.classes))
+
+            label = "{}:{:.2f}".format(self.classes[class_ids[i]], confidences[i])
+
+            print("label:", label)
+
+            self.draw_label(input_image, label, left, top)
+        return input_image
+
+    def process_image(self, *args):
+        ret, frame = self.capture.read()
+
+        if ret:
+            session = onnxruntime.InferenceSession('./models/yolov5n-640.onnx')
+
+            imgarr = np.array(frame)
+
+            img_data = self.preprocess(imgarr)
+
+            # start = time.time()
+            output = session.run(None, {session.get_inputs()[0].name: img_data})
+
+            img = self.post_process(imgarr, output)
+
+            texture = self.convert_frame_to_texture(img)
+            self.image.texture = texture
+
+
+class SuperResolutionPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(SuperResolutionPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Super Resolution"
+
+        self.content = BoxLayout(orientation="vertical", spacing=40)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        # slider_layout, self.slider = self.create_labeled_slider("Brightness", 0, 100, 50)
+        slider_layout, self.slider = self.create_labeled_slider("Upsample Factor: ", 1, 5, 4, value_format='{}')
+
+        slider_box = BoxLayout(size_hint_y=0.05)
+        self.content.add_widget(slider_box)
+        slider_box.add_widget(slider_layout)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
+    def process_image(self, *args):
+        ret, frame = self.capture.read()
+
+        downsample = 32
+        # Downsampling.
+        frame = cv2.resize(frame, None, fx=1 / downsample, fy=1 / downsample)
+
+        # frame = cv2.imread('images/image_1_downsampled.png')
+        if ret:
+            upsample_value = self.slider.value
+            print("upsample_value: ", upsample_value)
+            adjusted_frame = self.super_resolution(frame, upsample_value)
+            texture = self.convert_frame_to_texture(adjusted_frame)
+            self.image.texture = texture
+
+    @staticmethod
+    def super_resolution(img, value):
+        # Super resolution instance.
+        sr = cv2.dnn_superres.DnnSuperResImpl_create()
+        sr.readModel('models/EDSR_x4.pb')
+        # Set the model with the method and scale factor.
+        sr.setModel('edsr', value)
+        # Pass image through super resolution model.
+        result_edsr = sr.upsample(img)
+        return result_edsr
 
 class BrightnessPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -378,11 +598,11 @@ class UnderConstructionPopup(BasePopup):
 
 class STEMKitApp(App):
     def build(self):
+        Window.size = (400, 300)
         return MainLayout()
 
     def on_stop(self):
         self.root.on_stop()
-
 
 if __name__ == "__main__":
     STEMKitApp().run()
