@@ -31,8 +31,8 @@ class MainLayout(BoxLayout):
         self.add_widget(self.modules_layout)
 
         button_names = [
-            "Color Segmentation",
-            "Edge Detection",
+            "QR Code Decoder",
+            "Face Recognition",
             "Text Detection",
             "Object Detection",
             "Super Resolution",
@@ -51,8 +51,8 @@ class MainLayout(BoxLayout):
     def open_module_popup(self, instance):
         module_name = instance.text
 
-        if module_name == "Color Segmentation":
-            popup = ColorSegmentationPopup(self)
+        if module_name == "QR Code Decoder":
+            popup = QRCodeDecoderPopup(self)
         elif module_name == "Edge Detection":
             popup = CannyPopup(self)
         elif module_name == "Text Detection":
@@ -122,6 +122,81 @@ class BasePopup(Popup):
         self.process_button = Button(text="Process Image")
         self.process_button.bind(on_press=self.process_image)
         button_container.add_widget(self.process_button)
+
+class QRCodeDecoderPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(QRCodeDecoderPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Decode QR Code"
+
+        self.content = BoxLayout(orientation="vertical", spacing=40)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 1, 100, 60, value_format='{}%')
+
+        slider_box = BoxLayout(size_hint_y=0.05)
+        self.content.add_widget(slider_box)
+        slider_box.add_widget(slider_layout)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
+    def process_image(self, *args):
+        ret, frame = self.capture.read()
+
+        if ret:
+
+            qcd = cv2.QRCodeDetector()
+
+            # Convert frame to grayscale
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # Detect and decode QR code and text
+            retval, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
+
+            # Handle exceptions for frames without QR code
+            if retval is False:
+                # Pass stock frame as input to videostream
+                img = frame
+            else:
+                # Draw bounding boxes and show decoded text
+                img = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), 3)
+                # Draw text on top of bounding boxes
+                for s, p in zip(decoded_info, points):
+                    img = cv2.putText(frame, s, p[0].astype(int), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
+                                      cv2.LINE_AA)
+
+            texture = self.convert_frame_to_texture(img)
+            self.image.texture = texture
+
+        #     # Show frame
+        #     cv2.imshow('Decoded Image', img)
+        #     # Break and exit video stream
+        #     if cv2.waitKey(1) & 0xFF == ord('q'):
+        #         break
+        #
+        # # Release video object and destroy windows
+        # vid.release()
+        # cv2.destroyAllWindows()
+
+    @staticmethod
+    def adjust_brightness(img, value):
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        v = cv2.add(v, value)
+        v[v > 255] = 255
+        v[v < 0] = 0
+        final_hsv = cv2.merge((h, s, v))
+        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
 
 class ColorSegmentationPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -510,26 +585,34 @@ class SuperResolutionPopup(BasePopup):
 
         downsample = 32
         # Downsampling.
-        frame = cv2.resize(frame, None, fx=1 / downsample, fy=1 / downsample)
+        # frame = cv2.resize(frame, None, fx=1 / downsample, fy=1 / downsample)
 
         # frame = cv2.imread('images/image_1_downsampled.png')
         if ret:
-            upsample_value = self.slider.value
-            print("upsample_value: ", upsample_value)
-            adjusted_frame = self.super_resolution(frame, upsample_value)
-            texture = self.convert_frame_to_texture(adjusted_frame)
+            texture = self.convert_frame_to_texture(frame)
             self.image.texture = texture
+            # upsample_value = self.slider.value
+            # print("upsample_value: ", upsample_value)
+            # adjusted_frame = self.super_resolution(frame, upsample_value)
+            # texture = self.convert_frame_to_texture(adjusted_frame)
+            # self.image.texture = texture
 
     @staticmethod
-    def super_resolution(img, value):
-        # Super resolution instance.
-        sr = cv2.dnn_superres.DnnSuperResImpl_create()
-        sr.readModel('models/EDSR_x4.pb')
-        # Set the model with the method and scale factor.
-        sr.setModel('edsr', value)
-        # Pass image through super resolution model.
-        result_edsr = sr.upsample(img)
-        return result_edsr
+    def super_resolution(self, img, value):
+        # # Super resolution instance.
+        # sr = cv2.dnn_superres.DnnSuperResImpl_create()
+        # sr.readModel('models/EDSR_x4.pb')
+        # # Set the model with the method and scale factor.
+        # sr.setModel('edsr', value)
+        # # Pass image through super resolution model.
+        # result_edsr = sr.upsample(img)
+        # return result_edsr
+
+        # brightness_value = self.slider.value
+        # print("brightness_value: ", brightness_value)
+        # adjusted_frame = self.adjust_brightness(frame, brightness_value)
+        texture = self.convert_frame_to_texture(img)
+        self.image.texture = texture
 
 class BrightnessPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
