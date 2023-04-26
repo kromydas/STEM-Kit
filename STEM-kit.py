@@ -133,12 +133,6 @@ class QRCodeDecoderPopup(BasePopup):
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
-        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 1, 100, 60, value_format='{}%')
-
-        slider_box = BoxLayout(size_hint_y=0.05)
-        self.content.add_widget(slider_box)
-        slider_box.add_widget(slider_layout)
-
         button_layout = BoxLayout(size_hint_y=0.1)
         self.content.add_widget(button_layout)
 
@@ -172,8 +166,14 @@ class QRCodeDecoderPopup(BasePopup):
                 img = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), 3)
                 # Draw text on top of bounding boxes.
                 for s, p in zip(decoded_info, points):
-                    img = cv2.putText(frame, s, p[0].astype(int), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
-                                      cv2.LINE_AA)
+                    font_scale = 2
+                    print(p[0])
+
+                    px = p[0][0].astype(int)
+                    py = p[0][1].astype(int) - 30
+                    pos = [px, py]
+
+                    img = cv2.putText(frame, s, pos, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), 2, cv2.LINE_AA)
 
             texture = self.convert_frame_to_texture(img)
             self.image.texture = texture
@@ -188,7 +188,7 @@ class FaceRecognitionPopup(BasePopup):
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
-        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 1, 100, 60, value_format='{}%')
+        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 50, 100, 80, value_format='{}%')
 
         slider_box = BoxLayout(size_hint_y=0.05)
         self.content.add_widget(slider_box)
@@ -207,7 +207,7 @@ class FaceRecognitionPopup(BasePopup):
 
     def process_image(self, *args):
 
-        score_threshold = 0.8
+        score_threshold = self.slider.value/100.0
         nms_threshold = 0.3
         top_k = 5000
 
@@ -247,7 +247,7 @@ class FaceRecognitionPopup(BasePopup):
 
             ## [initialize_FaceRecognizerSF]
             recognizer = cv2.FaceRecognizerSF.create('./models/face_recognition_sface_2021dec_int8.onnx', "")
-            ## [initialize_FaceRecognizerSF]
+            # recognizer = cv2.FaceRecognizerSF.create('./models/face_recognition_sface_2021dec.onnx', "")
 
             ## [facerecognizer]
             # Align faces
@@ -256,6 +256,11 @@ class FaceRecognitionPopup(BasePopup):
                 skip_frame = False
             except:
                 print('NO FACE DETECTED')
+                msg = "No Face Detected, try adjusting camera position"
+                px = 200
+                img = cv2.putText(frame, msg, (px, int(frameHeight / 2)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 255), 4, cv2.LINE_AA)
+                texture = self.convert_frame_to_texture(img)
+                self.image.texture = texture
                 skip_frame = True
 
             if skip_frame == False:
@@ -266,26 +271,33 @@ class FaceRecognitionPopup(BasePopup):
                 face2_feature = recognizer.feature(face2_align)
 
                 cosine_similarity_threshold = 0.363
-                l2_similarity_threshold = 1.128
+                # l2_similarity_threshold = 1.128
+                l2_similarity_threshold = 1.3
 
                 ## [match]
                 cosine_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_COSINE)
                 l2_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
-                ## [match]
 
-                msg = 'DIFFERENT INDENTITIES'
-                if cosine_score >= cosine_similarity_threshold:
-                    msg = 'Identity Uknown'
-                # print('They have {}. Cosine Similarity: {}, threshold: {} (higher value means higher similarity, max 1.0).'.format(msg, cosine_score, cosine_similarity_threshold))
-                print(f"They have {msg} according to cosine acore")
+                # msg = 'DIFFERENT INDENTITIES'
+                # if cosine_score >= cosine_similarity_threshold:
+                #     msg = 'Identity Uknown'
+                # # print('They have {}. Cosine Similarity: {}, threshold: {} (higher value means higher similarity, max 1.0).'.format(msg, cosine_score, cosine_similarity_threshold))
+                # print(f"They have {msg} according to cosine acore")
 
-                msg = 'DIFFERENT INDENTITIES'
+                msg = 'No Match'
                 if l2_score <= l2_similarity_threshold:
-                    msg = 'Jack Ryan (Under Cover FBI Agent)'
+                    msg1 = 'Jack Ryan'
+                    msg2 = '[Under Cover FBI Agent]'
+                    px = 200
+                    py = int(frameHeight/2)
+                    img = cv2.putText(frame, msg1, (px, py), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA)
+                    py = int(frameHeight / 2) + 70
+                    img = cv2.putText(frame, msg2, (px, py), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA)
+                else:
+                    px = int(frameWidth/2) - 10
+                    img = cv2.putText(frame, msg, (px, int(frameHeight/2)), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 4, cv2.LINE_AA)
                 # print('They have {}. NormL2 Distance: {}, threshold: {} (lower value means higher similarity, min 0.0).'.format(msg, l2_score, l2_similarity_threshold))
-                print(f"They have the {msg} according to NormL2 distance")
-
-                img = cv2.putText(frame, msg, (150,150), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2, cv2.LINE_AA)
+                # print(f"They have the {msg} according to NormL2 distance")
 
                 texture = self.convert_frame_to_texture(img)
                 self.image.texture = texture
