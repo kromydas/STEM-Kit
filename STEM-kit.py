@@ -53,8 +53,8 @@ class MainLayout(BoxLayout):
 
         if module_name == "QR Code Decoder":
             popup = QRCodeDecoderPopup(self)
-        elif module_name == "Edge Detection":
-            popup = CannyPopup(self)
+        elif module_name == "Face Recognition":
+            popup = FaceRecognitionPopup(self)
         elif module_name == "Text Detection":
             popup = TextDetectionPopup(self)
         elif module_name == "Object Detection":
@@ -157,20 +157,20 @@ class QRCodeDecoderPopup(BasePopup):
 
             qcd = cv2.QRCodeDetector()
 
-            # Convert frame to grayscale
+            # Convert frame to grayscale.
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             # Detect and decode QR code and text
             retval, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
 
-            # Handle exceptions for frames without QR code
+            # Handle exceptions for frames without QR code.
             if retval is False:
                 # Pass stock frame as input to videostream
                 img = frame
             else:
-                # Draw bounding boxes and show decoded text
+                # Draw bounding boxes and show decoded text.
                 img = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), 3)
-                # Draw text on top of bounding boxes
+                # Draw text on top of bounding boxes.
                 for s, p in zip(decoded_info, points):
                     img = cv2.putText(frame, s, p[0].astype(int), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
                                       cv2.LINE_AA)
@@ -178,25 +178,118 @@ class QRCodeDecoderPopup(BasePopup):
             texture = self.convert_frame_to_texture(img)
             self.image.texture = texture
 
-        #     # Show frame
-        #     cv2.imshow('Decoded Image', img)
-        #     # Break and exit video stream
-        #     if cv2.waitKey(1) & 0xFF == ord('q'):
-        #         break
-        #
-        # # Release video object and destroy windows
-        # vid.release()
-        # cv2.destroyAllWindows()
+class FaceRecognitionPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(FaceRecognitionPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Decode QR Code"
 
-    @staticmethod
-    def adjust_brightness(img, value):
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        h, s, v = cv2.split(hsv)
-        v = cv2.add(v, value)
-        v[v > 255] = 255
-        v[v < 0] = 0
-        final_hsv = cv2.merge((h, s, v))
-        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
+        self.content = BoxLayout(orientation="vertical", spacing=40)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 1, 100, 60, value_format='{}%')
+
+        slider_box = BoxLayout(size_hint_y=0.05)
+        self.content.add_widget(slider_box)
+        slider_box.add_widget(slider_layout)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
+    def process_image(self, *args):
+
+        score_threshold = 0.8
+        nms_threshold = 0.3
+        top_k = 5000
+
+        detector = cv2.FaceDetectorYN.create(
+            './models/face_detection_yunet_2022mar_int8.onnx',
+            "",
+            (320, 320),
+            score_threshold,
+            nms_threshold,
+            top_k
+        )
+
+        tm = cv2.TickMeter()
+
+        scale = 1.0
+        frameWidth = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) * scale)
+        frameHeight = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * scale)
+        detector.setInputSize([frameWidth, frameHeight])
+
+        ret, frame = self.capture.read()
+
+        if ret:
+            frame = cv2.resize(frame, (frameWidth, frameHeight))
+
+            # Inference
+            faces = detector.detect(frame)  # faces is a tuple
+
+            img2 = cv2.imread(cv2.samples.findFile('./image_2.jpg'))
+            img2 = cv2.resize(img2, (frameWidth, frameHeight))
+
+
+            detector.setInputSize((img2.shape[1], img2.shape[0]))
+            faces2 = detector.detect(img2)
+
+            tm.stop()
+            assert faces2[1] is not None, 'Cannot find a face in {}'.format('./image_2.jpg')
+
+            ## [initialize_FaceRecognizerSF]
+            recognizer = cv2.FaceRecognizerSF.create('./models/face_recognition_sface_2021dec_int8.onnx', "")
+            ## [initialize_FaceRecognizerSF]
+
+            ## [facerecognizer]
+            # Align faces
+            try:
+                face1_align = recognizer.alignCrop(frame, faces[1][0])
+                skip_frame = False
+            except:
+                print('NO FACE DETECTED')
+                skip_frame = True
+
+            if skip_frame == False:
+                face2_align = recognizer.alignCrop(img2, faces2[1][0])
+
+                # Extract features
+                face1_feature = recognizer.feature(face1_align)
+                face2_feature = recognizer.feature(face2_align)
+
+                cosine_similarity_threshold = 0.363
+                l2_similarity_threshold = 1.128
+
+                ## [match]
+                cosine_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_COSINE)
+                l2_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
+                ## [match]
+
+                msg = 'DIFFERENT INDENTITIES'
+                if cosine_score >= cosine_similarity_threshold:
+                    msg = 'Identity Uknown'
+                # print('They have {}. Cosine Similarity: {}, threshold: {} (higher value means higher similarity, max 1.0).'.format(msg, cosine_score, cosine_similarity_threshold))
+                print(f"They have {msg} according to cosine acore")
+
+                msg = 'DIFFERENT INDENTITIES'
+                if l2_score <= l2_similarity_threshold:
+                    msg = 'Jack Ryan (Under Cover FBI Agent)'
+                # print('They have {}. NormL2 Distance: {}, threshold: {} (lower value means higher similarity, min 0.0).'.format(msg, l2_score, l2_similarity_threshold))
+                print(f"They have the {msg} according to NormL2 distance")
+
+                img = cv2.putText(frame, msg, (150,150), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2, cv2.LINE_AA)
+
+                texture = self.convert_frame_to_texture(img)
+                self.image.texture = texture
+
 
 class ColorSegmentationPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
