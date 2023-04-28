@@ -1,4 +1,4 @@
-import os
+import argparse
 import numpy as np
 import cv2
 import onnxruntime
@@ -16,10 +16,25 @@ from kivy.core.window import Window
 
 kivy.require("2.0.0")
 
-# Set the position of the window
-Window.left = 100  # horizontal position
-Window.top = 500   # vertical position (distance from the top of the screen)
+parser = argparse.ArgumentParser()
+parser.add_argument('--mode', '-m', type=str, default='SK', help='SK: STEM-Kit, LP: Laptop')
+args = parser.parse_args()
 
+# Set run mode configurations that appropriately scale application elements.
+if (args.mode == 'LT'):
+    # Laptop run mode.
+    Window.left = 100  # horizontal position
+    Window.top = 500   # vertical position (distance from the top of the screen)
+    font_scale = 2
+    font_width = 4
+    layout_padding_y = 40
+else:
+    # STEM-Kit run mode (default).
+    Window.left = 120  # horizontal position
+    Window.top = 20  # vertical position (distance from the top of the screen)
+    font_scale = 1
+    font_width = 2
+    layout_padding_y = 25
 
 class MainLayout(BoxLayout):
     def __init__(self, **kwargs):
@@ -27,18 +42,16 @@ class MainLayout(BoxLayout):
 
         self.orientation = "vertical"
 
-        self.modules_layout = GridLayout(cols=2, rows=4)
+        self.modules_layout = GridLayout(cols=2, rows=3)
         self.add_widget(self.modules_layout)
 
         button_names = [
             "QR Code Decoder",
             "Face Recognition",
-            "Text Detection",
-            "Object Detection",
+            "Image Deblurring",
             "Super Resolution",
+            "Object Detection",
             "Module 6",
-            "Module 7",
-            "Module 8",
         ]
 
         for i in range(len(button_names)):
@@ -55,6 +68,8 @@ class MainLayout(BoxLayout):
             popup = QRCodeDecoderPopup(self)
         elif module_name == "Face Recognition":
             popup = FaceRecognitionPopup(self)
+        elif module_name == "Image Deblurring":
+            popup = UnderConstructionPopup(self)
         elif module_name == "Text Detection":
             popup = TextDetectionPopup(self)
         elif module_name == "Object Detection":
@@ -80,7 +95,7 @@ class BasePopup(Popup):
         self.dismiss()
 
     @staticmethod
-    def convert_frame_to_texture(frame):
+    def convert_frame_to_texture(self, frame):
         buf = cv2.flip(frame, 0).tostring()
         texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
@@ -128,7 +143,7 @@ class QRCodeDecoderPopup(BasePopup):
         super(QRCodeDecoderPopup, self).__init__(main_layout, **kwargs)
         self.title = "Decode QR Code"
 
-        self.content = BoxLayout(orientation="vertical", spacing=40)
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
@@ -144,51 +159,61 @@ class QRCodeDecoderPopup(BasePopup):
         self.process_button.bind(on_press=self.process_image)
         button_layout.add_widget(self.process_button)
 
+        self.frame_count = 0
+
     def process_image(self, *args):
+
         ret, frame = self.capture.read()
+        self.frame_count += 1
+        print("self.frame_count: ", self.frame_count)
 
         if ret:
+
+            print("ret: ", ret)
 
             qcd = cv2.QRCodeDetector()
 
             # Convert frame to grayscale.
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-            # Detect and decode QR code and text
+            # Detect and decode QR code and text.
             retval, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
 
             # Handle exceptions for frames without QR code.
             if retval is False:
-                # Pass stock frame as input to videostream
+                # Pass stock frame as input to videostream.
                 img = frame
             else:
                 # Draw bounding boxes and show decoded text.
                 img = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), 3)
                 # Draw text on top of bounding boxes.
                 for s, p in zip(decoded_info, points):
-                    font_scale = 2
-                    print(p[0])
 
                     px = p[0][0].astype(int)
-                    py = p[0][1].astype(int) - 30
+                    py = p[0][1].astype(int)
                     pos = [px, py]
 
-                    img = cv2.putText(frame, s, pos, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), 2, cv2.LINE_AA)
+                    img = cv2.putText(frame, s, pos, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), font_width, cv2.LINE_AA)
 
             texture = self.convert_frame_to_texture(img)
             self.image.texture = texture
+            # time.sleep(1)
 
 class FaceRecognitionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(FaceRecognitionPopup, self).__init__(main_layout, **kwargs)
-        self.title = "Decode QR Code"
+        self.title = "Facial Recognition"
 
-        self.content = BoxLayout(orientation="vertical", spacing=40)
+        self.face_detetcion_model   = './models/face_detection_yunet_2022mar_int8.onnx'
+        self.face_recognition_model = './models/face_recognition_sface_2021dec_int8.onnx'
+        self.target_image           = './input_media/target_image.jpg'
+
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
-        slider_layout, self.slider = self.create_labeled_slider("Confidence: ", 50, 100, 80, value_format='{}%')
+        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 10, 13, 11, value_format='{}')
 
         slider_box = BoxLayout(size_hint_y=0.05)
         self.content.add_widget(slider_box)
@@ -205,110 +230,133 @@ class FaceRecognitionPopup(BasePopup):
         self.process_button.bind(on_press=self.process_image)
         button_layout.add_widget(self.process_button)
 
+    def visualize(self, input, faces, thickness=1):
+        if faces[1] is not None:
+            for idx, face in enumerate(faces[1]):
+                # print('Face {}, top-left coordinates: ({:.0f}, {:.0f}), box width: {:.0f}, box height {:.0f}, score: {:.2f}'.format(idx, face[0], face[1], face[2], face[3], face[-1]))
+
+                coords = face[:-1].astype(np.int32)
+                cv2.rectangle(input, (coords[0], coords[1]), (coords[0] + coords[2], coords[1] + coords[3]),
+                              (0, 255, 0), thickness)
+                cv2.circle(input, (coords[4], coords[5]), 2, (255, 0, 0), thickness)
+                cv2.circle(input, (coords[6], coords[7]), 2, (0, 0, 255), thickness)
+                cv2.circle(input, (coords[8], coords[9]), 2, (0, 255, 0), thickness)
+                cv2.circle(input, (coords[10], coords[11]), 2, (255, 0, 255), thickness)
+                cv2.circle(input, (coords[12], coords[13]), 2, (0, 255, 255), thickness)
+
+    def draw_label_banner(self, bbox, frame, text, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
+                          font_thickness=1):
+
+        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
+        # Center label banner on bounding box.
+        text_pad = 5
+        px1 = int(bbox[0] + (bbox[2] / 2)) - int(text_size[0] / 2) - text_pad
+        px2 = int(bbox[0] + (bbox[2] / 2)) + int(text_size[0] / 2) + text_pad
+        py1 = int(bbox[1] + (bbox[3] / 2)) - int(text_size[1] / 2) - text_pad
+        py2 = int(bbox[1] + (bbox[3] / 2)) + int(text_size[1] / 2) + text_pad
+        # Annotate frame with filled rectangle.
+        frame = cv2.rectangle(frame, (px1, py1), (px2, py2), fill_color, thickness=-1, lineType=cv2.LINE_8)
+        px = int(bbox[0] + (bbox[2] / 2)) - int(text_size[0] / 2)
+        py = int(bbox[1] + (bbox[3] / 2)) + int(text_size[1] / 2)
+        # Annotate frame with text (over filled rectangle).
+        cv2.putText(frame, text, (px, py), cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
+                    cv2.LINE_AA)
+
     def process_image(self, *args):
 
-        score_threshold = self.slider.value/100.0
+        similarity_threshold = self.slider.value/10
         nms_threshold = 0.3
+        score_threshold = 0.9
         top_k = 5000
+        skip_frame = False
 
         detector = cv2.FaceDetectorYN.create(
-            './models/face_detection_yunet_2022mar_int8.onnx',
+            self.face_detetcion_model,
             "",
             (320, 320),
             score_threshold,
             nms_threshold,
             top_k
         )
-
-        tm = cv2.TickMeter()
-
         scale = 1.0
         frameWidth = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) * scale)
         frameHeight = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * scale)
         detector.setInputSize([frameWidth, frameHeight])
 
+        target_image = cv2.imread(cv2.samples.findFile(self.target_image))
+
         ret, frame = self.capture.read()
 
         if ret:
+
             frame = cv2.resize(frame, (frameWidth, frameHeight))
 
-            # Inference
-            faces = detector.detect(frame)  # faces is a tuple
+            # --------------------------------------------------
+            # Perform face detection on the input video frame.
+            # --------------------------------------------------
+            stream_faces = detector.detect(frame)  # faces is a tuple
 
-            img2 = cv2.imread(cv2.samples.findFile('./image_2.jpg'))
-            img2 = cv2.resize(img2, (frameWidth, frameHeight))
-
-
-            detector.setInputSize((img2.shape[1], img2.shape[0]))
-            faces2 = detector.detect(img2)
-
-            tm.stop()
-            assert faces2[1] is not None, 'Cannot find a face in {}'.format('./image_2.jpg')
-
-            ## [initialize_FaceRecognizerSF]
-            recognizer = cv2.FaceRecognizerSF.create('./models/face_recognition_sface_2021dec_int8.onnx', "")
-            # recognizer = cv2.FaceRecognizerSF.create('./models/face_recognition_sface_2021dec.onnx', "")
-
-            ## [facerecognizer]
-            # Align faces
-            try:
-                face1_align = recognizer.alignCrop(frame, faces[1][0])
-                skip_frame = False
-            except:
-                print('NO FACE DETECTED')
-                msg = "No Face Detected, try adjusting camera position"
-                px = 200
-                img = cv2.putText(frame, msg, (px, int(frameHeight / 2)), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 255), 4, cv2.LINE_AA)
-                texture = self.convert_frame_to_texture(img)
-                self.image.texture = texture
+            # Check for face detections in the video frame.
+            if stream_faces[1] is not None:
+                coords = stream_faces[1][0].astype(np.int32)
+                bbox = coords[0:4]
+                # Annotate each detected face with a bounding box and facial landmark points.
+                self.visualize(frame, stream_faces)
+            else:
+                msg = "No Face Detected in the current frame."
+                frame_coord = [0, 0, frameWidth, frameHeight]
+                self.draw_label_banner(frame_coord, frame, msg, font_color=(255, 0, 255), fill_color=(0, 0, 0),
+                                  font_scale=0.5, font_thickness=1)
                 skip_frame = True
 
-            if skip_frame == False:
-                face2_align = recognizer.alignCrop(img2, faces2[1][0])
+                texture = self.convert_frame_to_texture(frame)
+                self.image.texture = texture
 
-                # Extract features
-                face1_feature = recognizer.feature(face1_align)
-                face2_feature = recognizer.feature(face2_align)
+            if skip_frame == False:
+                target_image = cv2.resize(target_image, (frameWidth, frameHeight))
+                detector.setInputSize((target_image.shape[1], target_image.shape[0]))
+                target_face = detector.detect(target_image)
+
+                # Confirm a face was detected in the target image provided.
+                assert target_face[1] is not None, 'Cannot find a face in {}'.format(args.target_image)
+
+                # Initialize FaceRecognizerSF.
+                recognizer = cv2.FaceRecognizerSF.create(self.face_recognition_model, "")
+
+                # Align detected face in video frame and extract features.
+                stream_face_align = recognizer.alignCrop(frame, stream_faces[1][0])
+                stream_face_feature = recognizer.feature(stream_face_align)
+
+                # Align target face and extract features.
+                target_face_align = recognizer.alignCrop(target_image, target_face[1][0])
+                target_face_feature = recognizer.feature(target_face_align)
 
                 cosine_similarity_threshold = 0.363
                 # l2_similarity_threshold = 1.128
-                l2_similarity_threshold = 1.3
+                l2_similarity_threshold = similarity_threshold
 
-                ## [match]
-                cosine_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_COSINE)
-                l2_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
+                cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
+                l2_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
 
-                # msg = 'DIFFERENT INDENTITIES'
-                # if cosine_score >= cosine_similarity_threshold:
-                #     msg = 'Identity Uknown'
-                # # print('They have {}. Cosine Similarity: {}, threshold: {} (higher value means higher similarity, max 1.0).'.format(msg, cosine_score, cosine_similarity_threshold))
-                # print(f"They have {msg} according to cosine acore")
-
-                msg = 'No Match'
                 if l2_score <= l2_similarity_threshold:
-                    msg1 = 'Jack Ryan'
-                    msg2 = '[Under Cover FBI Agent]'
-                    px = 200
-                    py = int(frameHeight/2)
-                    img = cv2.putText(frame, msg1, (px, py), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA)
-                    py = int(frameHeight / 2) + 70
-                    img = cv2.putText(frame, msg2, (px, py), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4, cv2.LINE_AA)
+                    msg = 'Jack Ryan [Under Cover FBI Agent]'
+                    self.draw_label_banner(bbox, frame, msg, font_color=(0, 255, 0), fill_color=(0, 0, 0),
+                                           font_scale=0.5, font_thickness=1)
                 else:
-                    px = int(frameWidth/2) - 10
-                    img = cv2.putText(frame, msg, (px, int(frameHeight/2)), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 4, cv2.LINE_AA)
-                # print('They have {}. NormL2 Distance: {}, threshold: {} (lower value means higher similarity, min 0.0).'.format(msg, l2_score, l2_similarity_threshold))
-                # print(f"They have the {msg} according to NormL2 distance")
+                    msg = 'No Match'
+                    text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_width + 2)[0]
+                    self.draw_label_banner(bbox, frame, msg, font_color=(0, 0, 255), fill_color=(0, 0, 0),
+                                           font_scale=0.5, font_thickness=1)
 
-                texture = self.convert_frame_to_texture(img)
+                texture = self.convert_frame_to_texture(frame)
                 self.image.texture = texture
-
 
 class ColorSegmentationPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(ColorSegmentationPopup, self).__init__(main_layout, **kwargs)
         self.title = "Adjust Color Thresholds"
 
-        self.content = BoxLayout(orientation="vertical", spacing=40)
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
@@ -354,7 +402,7 @@ class CannyPopup(BasePopup):
         super(CannyPopup, self).__init__(main_layout, **kwargs)
         self.title = "Canny Edge Detection"
 
-        self.content = BoxLayout(orientation="vertical", spacing=40)
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
@@ -400,7 +448,7 @@ class TextDetectionPopup(BasePopup):
         super(TextDetectionPopup, self).__init__(main_layout, **kwargs)
         self.title = "Adjust Text Detection"
 
-        self.content = BoxLayout(orientation="vertical", spacing=40)
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
@@ -508,7 +556,7 @@ class ObjectDetectionPopup(BasePopup):
         super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
         self.title = "Adjust Detection Threshold"
 
-        self.content = BoxLayout(orientation="vertical", spacing=40)
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
@@ -786,11 +834,15 @@ class UnderConstructionPopup(BasePopup):
 
 class STEMKitApp(App):
     def build(self):
-        Window.size = (400, 300)
+        if (args.mode == 'LT'):
+            Window.size = (800, 600)
+        else:
+            Window.size = (450, 400)
         return MainLayout()
 
     def on_stop(self):
         self.root.on_stop()
 
 if __name__ == "__main__":
+
     STEMKitApp().run()
