@@ -1,3 +1,12 @@
+# ------------------------------------------------------------------------------
+#
+# User Interface for STEM Kit computer vision applications.
+#
+#   Assumes supporting models are present in ./models
+#
+# Developed by Big Vision LLC for Emerging Technologies Institute (ETI).
+# ------------------------------------------------------------------------------
+
 import argparse
 import numpy as np
 import cv2
@@ -28,15 +37,60 @@ if (args.mode == 'LT'):
     Window.left = 100  # horizontal position
     Window.top = 500   # vertical position (distance from the top of the screen)
     font_scale = 2
-    font_width = 4
+    font_thickness = 2
     layout_padding_y = 40
 else:
     # STEM-Kit run mode (default).
     Window.left = 120  # horizontal position
     Window.top = 20  # vertical position (distance from the top of the screen)
-    font_scale = 1
-    font_width = 2
+    font_scale = 0.9
+    font_thickness = 2
     layout_padding_y = 25
+
+def find_centroid_bbox(bbox):
+    '''
+    Finds the centroid of the input bounding box [x, y, w, h].
+    '''
+    mid_x = int(bbox[0] + bbox[2] / 2)
+    mid_y = int(bbox[1] + bbox[3] / 2)
+
+    # Return the coordinates of the centroid.
+    return mid_x, mid_y
+
+def find_centroid_vertices(points):
+    '''
+    Finds the centroid of the input coordinates.
+    '''
+    min_x, max_x = np.min(points[:, 0]), np.max(points[:, 0])
+    min_y, max_y = np.min(points[:, 1]), np.max(points[:, 1])
+    mid_x = (min_x + max_x) / 2
+    mid_y = (min_y + max_y) / 2
+
+    # Return the coordinates of the centroid.
+    return mid_x, mid_y
+
+def draw_label_banner(frame, text, centroid, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
+                      font_thickness=1):
+    '''
+    Annotate the image frame with a text banner overlayed on a filled rectangle.
+    '''
+    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
+    text_pad = 10
+    # Define upper left and lower right vertices of rectangle.
+    px1 = int(centroid[0]) - int(text_size[0] / 2) - text_pad
+    px2 = int(centroid[0]) + int(text_size[0] / 2) + text_pad
+
+    py1 = int(centroid[1]) - int(text_size[1] / 2) - text_pad
+    py2 = int(centroid[1]) + int(text_size[1] / 2) + text_pad
+
+    frame = cv2.rectangle(frame, (px1, py1), (px2, py2), fill_color, thickness=-1, lineType=cv2.LINE_8)
+
+    # Define the lower left coordinate for the text.
+    px = int(centroid[0]) - int(text_size[0] / 2)
+    py = int(centroid[1]) + int(text_size[1] / 2)
+
+    cv2.putText(frame, text, (px, py), cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
+                cv2.LINE_AA)
 
 class MainLayout(BoxLayout):
     def __init__(self, **kwargs):
@@ -44,16 +98,18 @@ class MainLayout(BoxLayout):
 
         self.orientation = "vertical"
 
-        self.modules_layout = GridLayout(cols=2, rows=3)
+        self.modules_layout = GridLayout(cols=2, rows=4)
         self.add_widget(self.modules_layout)
 
         button_names = [
-            "QR Code Decoder",
+            "Module 1",
+            "Module 2",
             "Face Recognition",
-            "Image Deblurring",
-            "Module 4",
+            "QR Code Decoder",
             "Module 5",
             "Module 6",
+            "Module 7",
+            "Module 8",
         ]
 
         for i in range(len(button_names)):
@@ -111,19 +167,18 @@ class BasePopup(Popup):
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
         return texture
 
-    def create_labeled_slider(self, label_text, min_value, max_value, initial_value, value_format='{}', size_hint_label=.2):
+    def create_labeled_slider(self, label_text, min_value, max_value, initial_value, value_format='{}', size_hint_label=.4):
         layout = BoxLayout(orientation="horizontal", size_hint_y=None, height="30dp")
 
         label = Label(text=label_text, size_hint_x=size_hint_label)
         layout.add_widget(label)
 
-        slider = Slider(min=min_value, max=max_value, value=initial_value, size_hint_x=0.85)
+        slider = Slider(min=min_value, max=max_value, value=initial_value, size_hint_x=0.5)
         layout.add_widget(slider)
 
         value_label = Label(text=value_format.format(initial_value), size_hint_x=0.1)
         layout.add_widget(value_label)
-
-        slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(int(value))))
+        slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(value)))
 
         return layout, slider
 
@@ -183,39 +238,27 @@ class QRCodeDecoderPopup(BasePopup):
         if frame is None:
             return
 
-        # ret, frame = self.capture.read()
-        # self.frame_count += 1
-        # print("self.frame_count: ", self.frame_count)
-
         else:
 
             qcd = cv2.QRCodeDetector()
 
-            # Convert frame to grayscale.
+            # Convert the current frame to grayscale and decode any found QR codes.
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
 
-            # Detect and decode QR code and text.
-            retval, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
+            if found_qr_code is True:
 
-            # Handle exceptions for frames without QR code.
-            if retval is False:
-                # Pass stock frame as input to videostream.
-                img = frame
-            else:
-                # Draw bounding boxes and show decoded text.
-                img = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), 3)
-                # Draw text on top of bounding boxes.
-                for s, p in zip(decoded_info, points):
+                # Outline each detected QR code.
+                frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
 
-                    px = p[0][0].astype(int)
-                    py = p[0][1].astype(int)
-                    pos = [px, py]
+                # Annotate the frame with the decoded message.
+                for msg, points in zip(decoded_info, points):
+                    centroid = find_centroid_vertices(points)
+                    draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+                                      font_scale=font_scale, font_thickness=font_thickness)
 
-                    img = cv2.putText(frame, s, pos, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), font_width, cv2.LINE_AA)
-
-            texture = self.convert_frame_to_texture(self, img)
+            texture = self.convert_frame_to_texture(self, frame)
             self.image.texture = texture
-            # time.sleep(1)
 
 class FaceRecognitionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -224,14 +267,14 @@ class FaceRecognitionPopup(BasePopup):
 
         self.face_detetcion_model   = './models/face_detection_yunet_2022mar_int8.onnx'
         self.face_recognition_model = './models/face_recognition_sface_2021dec_int8.onnx'
-        self.target_image           = './input_media/target_image.jpg'
+        self.target_image           = './input_media/target_image.png'
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
-        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 10, 13, 11, value_format='{}', size_hint_label=0.5)
+        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10, value_format='{:.2f}', size_hint_label=0.4)
 
         slider_box = BoxLayout(size_hint_y=0.05)
         self.content.add_widget(slider_box)
@@ -248,7 +291,7 @@ class FaceRecognitionPopup(BasePopup):
         self.process_button.bind(on_press=self.process_image)
         button_layout.add_widget(self.process_button)
 
-    def visualize(self, input, faces, thickness=1):
+    def visualize(self, input, faces, thickness=2):
         if faces[1] is not None:
             for idx, face in enumerate(faces[1]):
                 # print('Face {}, top-left coordinates: ({:.0f}, {:.0f}), box width: {:.0f}, box height {:.0f}, score: {:.2f}'.format(idx, face[0], face[1], face[2], face[3], face[-1]))
@@ -262,27 +305,9 @@ class FaceRecognitionPopup(BasePopup):
                 cv2.circle(input, (coords[10], coords[11]), 2, (255, 0, 255), thickness)
                 cv2.circle(input, (coords[12], coords[13]), 2, (0, 255, 255), thickness)
 
-    def draw_label_banner(self, bbox, frame, text, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
-                          font_thickness=1):
-
-        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
-        # Center label banner on bounding box.
-        text_pad = 5
-        px1 = int(bbox[0] + (bbox[2] / 2)) - int(text_size[0] / 2) - text_pad
-        px2 = int(bbox[0] + (bbox[2] / 2)) + int(text_size[0] / 2) + text_pad
-        py1 = int(bbox[1] + (bbox[3] / 2)) - int(text_size[1] / 2) - text_pad
-        py2 = int(bbox[1] + (bbox[3] / 2)) + int(text_size[1] / 2) + text_pad
-        # Annotate frame with filled rectangle.
-        frame = cv2.rectangle(frame, (px1, py1), (px2, py2), fill_color, thickness=-1, lineType=cv2.LINE_8)
-        px = int(bbox[0] + (bbox[2] / 2)) - int(text_size[0] / 2)
-        py = int(bbox[1] + (bbox[3] / 2)) + int(text_size[1] / 2)
-        # Annotate frame with text (over filled rectangle).
-        cv2.putText(frame, text, (px, py), cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
-                    cv2.LINE_AA)
-
     def process_image(self, *args):
 
-        similarity_threshold = self.slider.value/10
+        similarity_threshold = self.slider.value
         nms_threshold = 0.3
         score_threshold = 0.9
         top_k = 5000
@@ -303,7 +328,6 @@ class FaceRecognitionPopup(BasePopup):
 
         target_image = cv2.imread(cv2.samples.findFile(self.target_image))
 
-        # ret, frame = self.capture.read()
         frame = self.get_latest_frame()
         if frame is None:
             return
@@ -325,9 +349,10 @@ class FaceRecognitionPopup(BasePopup):
                 self.visualize(frame, stream_faces)
             else:
                 msg = "No Face Detected in the current frame."
-                frame_coord = [0, 0, frameWidth, frameHeight]
-                self.draw_label_banner(frame_coord, frame, msg, font_color=(255, 0, 255), fill_color=(0, 0, 0),
-                                  font_scale=0.5, font_thickness=1)
+                frame_bbox = [0, 0, frameWidth, frameHeight]
+                centroid = find_centroid_bbox(frame_bbox)
+                draw_label_banner(frame, msg, centroid, font_color=(255, 0, 255), fill_color=(0, 0, 0),
+                                  font_scale=font_scale, font_thickness=font_thickness)
                 skip_frame = True
 
                 texture = self.convert_frame_to_texture(self, frame)
@@ -361,13 +386,14 @@ class FaceRecognitionPopup(BasePopup):
 
                 if l2_score <= l2_similarity_threshold:
                     msg = 'Jack Ryan [Under Cover FBI Agent]'
-                    self.draw_label_banner(bbox, frame, msg, font_color=(0, 255, 0), fill_color=(0, 0, 0),
-                                           font_scale=0.5, font_thickness=1)
+                    centroid = find_centroid_bbox(bbox)
+                    draw_label_banner(frame, msg, centroid, font_color=(0, 255, 0), fill_color=(0, 0, 0),
+                                      font_scale=font_scale, font_thickness=font_thickness)
                 else:
                     msg = 'No Match'
-                    text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_width + 2)[0]
-                    self.draw_label_banner(bbox, frame, msg, font_color=(0, 0, 255), fill_color=(0, 0, 0),
-                                           font_scale=0.5, font_thickness=1)
+                    centroid = find_centroid_bbox(bbox)
+                    draw_label_banner(frame, msg, centroid, font_color=(0, 0, 255), fill_color=(0, 0, 0),
+                                      font_scale=font_scale, font_thickness=font_thickness)
 
                 texture = self.convert_frame_to_texture(self, frame)
                 self.image.texture = texture
