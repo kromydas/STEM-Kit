@@ -43,7 +43,7 @@ else:
     # STEM-Kit run mode (default).
     Window.left = 120  # horizontal position
     Window.top = 20  # vertical position (distance from the top of the screen)
-    font_scale = 0.9
+    font_scale = 0.8
     font_thickness = 2
     layout_padding_y = 25
 

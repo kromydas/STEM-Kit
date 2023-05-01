@@ -20,7 +20,7 @@ import cv2
 import numpy as np
 
 # Set font scale and thickness for STEM-Kit resolution.
-font_scale = 1
+font_scale = .8
 font_thickness = 2
 
 def find_centroid_vertices(points):

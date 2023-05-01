@@ -23,7 +23,7 @@ import argparse
 import numpy as np
 import cv2
 
-font_scale = .9
+font_scale = .8
 font_thickness = 2
 
 parser = argparse.ArgumentParser()
