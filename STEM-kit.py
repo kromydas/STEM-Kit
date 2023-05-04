@@ -6,11 +6,13 @@
 #
 # Developed by Big Vision LLC for Emerging Technologies Institute (ETI).
 # ------------------------------------------------------------------------------
+import os
+os.environ["KIVY_NO_ARGS"] = "1"
 
-import argparse
+import sys
 import numpy as np
 import cv2
-import pyzbar.pyzbar as pyzbar
+# import pyzbar.pyzbar as pyzbar
 import onnxruntime
 import kivy
 from kivy.clock import Clock
@@ -29,25 +31,29 @@ import queue
 
 kivy.require("2.0.0")
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--mode', '-m', type=str, default='SK', help='SK: STEM-Kit, LP: Laptop')
-args = parser.parse_args()
+def parse_command_line_args():
+    mode = "SK"
+    for i, arg in enumerate(sys.argv):
+        if arg in ["--mode", "-m"] and i + 1 < len(sys.argv):
+            mode = sys.argv[i + 1]
+    return mode
 
 # Set run mode configurations that appropriately scale application elements.
-if (args.mode == 'LT'):
-    # Laptop run mode.
-    Window.left = 100  # horizontal position
-    Window.top = 500   # vertical position (distance from the top of the screen)
-    font_scale = 2
-    font_thickness = 2
-    layout_padding_y = 40
-else:
+mode = parse_command_line_args()
+if mode == 'SK':
     # STEM-Kit run mode (default).
     Window.left = 120  # horizontal position
     Window.top = 20  # vertical position (distance from the top of the screen)
     font_scale = 0.8
     font_thickness = 2
     layout_padding_y = 25
+else:
+    # Laptop run mode.
+    Window.left = 450  # horizontal position
+    Window.top = 200   # vertical position (distance from the top of the screen)
+    font_scale = .9
+    font_thickness = 2
+    layout_padding_y = 40
 
 def find_centroid_bbox(bbox):
     '''
@@ -320,9 +326,7 @@ class FaceRecognitionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        self.process_button = Button(text="Process image")
-        self.process_button.bind(on_press=self.process_image)
-        button_layout.add_widget(self.process_button)
+        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
 
     def visualize(self, input, faces, thickness=2):
         if faces[1] is not None:
@@ -338,7 +342,7 @@ class FaceRecognitionPopup(BasePopup):
                 cv2.circle(input, (coords[10], coords[11]), 2, (255, 0, 255), thickness)
                 cv2.circle(input, (coords[12], coords[13]), 2, (0, 255, 255), thickness)
 
-    def process_image(self, *args):
+    def process_image(self, dt, *args):
 
         similarity_threshold = self.slider.value
         nms_threshold = 0.3
@@ -354,9 +358,11 @@ class FaceRecognitionPopup(BasePopup):
             nms_threshold,
             top_k
         )
-        scale = 1.0
-        frameWidth = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) * scale)
-        frameHeight = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * scale)
+        # scale = 1.0
+        # frameWidth = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) * scale)
+        # frameHeight = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * scale)
+        frameWidth = 640
+        frameHeight = 480
         detector.setInputSize([frameWidth, frameHeight])
 
         target_image = cv2.imread(cv2.samples.findFile(self.target_image))
@@ -497,10 +503,10 @@ class UnderConstructionPopup(BasePopup):
 
 class STEMKitApp(App):
     def build(self):
-        if (args.mode == 'LT'):
+        if (mode == 'LT'):
             Window.size = (800, 600)
         else:
-            Window.size = (450, 400)
+            Window.size = (450, 350)
         return MainLayout()
 
     def on_stop(self):
