@@ -114,6 +114,7 @@ if __name__ == '__main__':
     if args.target_image is not None:
         target_image = cv2.imread(cv2.samples.findFile(args.target_image))
 
+    move_window_flag = True
     iter = 0
     while (True):
         hasFrame, frame = cap.read()
@@ -189,6 +190,11 @@ if __name__ == '__main__':
                 draw_label_banner(frame, msg, centroid, font_color=(0, 0, 255), fill_color=(0,0,0), font_scale=font_scale, font_thickness=font_thickness)
             tm.stop()
             cv2.imshow('Live', frame)
+
+            if move_window_flag:
+                cv2.moveWindow('Live', 100, 20)
+                move_window_flag = False
+
             iter += 1
 
         key = cv2.waitKey(1)
