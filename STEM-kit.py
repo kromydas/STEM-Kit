@@ -12,7 +12,7 @@ os.environ["KIVY_NO_ARGS"] = "1"
 import sys
 import numpy as np
 import cv2
-# import pyzbar.pyzbar as pyzbar
+import pyzbar.pyzbar as pyzbar
 import onnxruntime
 import kivy
 from kivy.clock import Clock
@@ -42,8 +42,8 @@ def parse_command_line_args():
 mode = parse_command_line_args()
 if mode == 'SK':
     # STEM-Kit run mode (default).
-    Window.left = 120  # horizontal position
-    Window.top = 20  # vertical position (distance from the top of the screen)
+    Window.left = 140  # horizontal position
+    Window.top = 30  # vertical position (distance from the top of the screen)
     font_scale = 0.8
     font_thickness = 2
     layout_padding_y = 25
@@ -506,7 +506,7 @@ class STEMKitApp(App):
         if (mode == 'LT'):
             Window.size = (800, 600)
         else:
-            Window.size = (450, 350)
+            Window.size = (500, 400)
         return MainLayout()
 
     def on_stop(self):
