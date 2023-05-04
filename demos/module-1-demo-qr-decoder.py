@@ -16,12 +16,17 @@
 #------------------------------------------------------------------------------
 
 # Import libraries.
+import argparse
 import cv2
 import numpy as np
 
 # Set font scale and thickness for STEM-Kit resolution.
 font_scale = .8
 font_thickness = 2
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--scale', '-sc', type=float, default=.5, help='Scale factor used to resize input video frames.')
+args = parser.parse_args()
 
 def find_centroid_vertices(points):
     '''
@@ -57,8 +62,12 @@ def draw_label_banner(frame, text, centroid, font_color=(0, 0, 0), fill_color=(2
     cv2.putText(frame, text, (px, py), cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness, cv2.LINE_AA)
 
 # Initialize videocapture object.
-camera_index = 0
-vid = cv2.VideoCapture(camera_index)
+deviceId = 0
+cap = cv2.VideoCapture(deviceId)
+
+# Set the detector input size based on the video frame size.
+frameWidth = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) * args.scale)
+frameHeight = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) * args.scale)
 
 # Initialize QR detector.
 qcd = cv2.QRCodeDetector()
@@ -67,9 +76,11 @@ qcd = cv2.QRCodeDetector()
 while(True):
 
     # Read one frame at a time from the video camera.
-    has_frame, frame = vid.read()
+    has_frame, frame = cap.read()
 
     if has_frame:
+
+        frame = cv2.resize(frame, (frameWidth, frameHeight))
 
         # Convert the current frame to grayscale and decode any found QR codes.
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -87,7 +98,7 @@ while(True):
                                   font_thickness=font_thickness)
 
         # Display annotated frame in window.
-        cv2.imshow('Decoded Image', frame)
+        cv2.imshow('Live', frame)
 
         key = cv2.waitKey(1)
         # Quit program when `q` or the `esc` key is selected.
@@ -95,5 +106,5 @@ while(True):
             break
     
 # Release video object and destroy windows.
-vid.release()
+cap.release()
 cv2.destroyAllWindows()
