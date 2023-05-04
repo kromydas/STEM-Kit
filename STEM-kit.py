@@ -12,6 +12,7 @@ import numpy as np
 import cv2
 import onnxruntime
 import kivy
+from kivy.clock import Clock
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
@@ -226,13 +227,11 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        self.process_button = Button(text="Process image")
-        self.process_button.bind(on_press=self.process_image)
-        button_layout.add_widget(self.process_button)
+        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
 
         self.frame_count = 0
 
-    def process_image(self, *args):
+    def process_image(self, dt, *args):
 
         frame = self.get_latest_frame()
         if frame is None:
