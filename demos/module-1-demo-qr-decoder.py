@@ -29,18 +29,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--scale', '-sc', type=float, default=.75, help='Scale factor used to resize input video frames.')
 args = parser.parse_args()
 
-# def find_centroid_vertices(points):
-#     '''
-#     Finds the centroid of the input coordinates.
-#     '''
-#     min_x, max_x = np.min(points[:, 0]), np.max(points[:, 0])
-#     min_y, max_y = np.min(points[:, 1]), np.max(points[:, 1])
-#     mid_x = (min_x + max_x) / 2
-#     mid_y = (min_y + max_y) / 2
-#
-#     # Return the coordinates of the centroid.
-#     return mid_x, mid_y
-
 def find_centroid_bbox(bbox):
     '''
     Finds the centroid of the input bounding box [x, y, w, h].
