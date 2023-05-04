@@ -19,6 +19,7 @@
 # ------------------------------------------------------------------------------
 
 import argparse
+
 import numpy as np
 import cv2
 
@@ -29,7 +30,6 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--target_image', '-trg', type=str, help='Path to target image to match.')
 parser.add_argument('--video', '-v', type=str, help='Path to the input video.')
-parser.add_argument('--scale', '-sc', type=float, default=.75, help='Scale factor used to resize input video frames.')
 parser.add_argument('--face_detection_model', '-fd', type=str, default='../models/face_detection_yunet_2022mar_int8.onnx', help='Path to the face detection model. Download the model at https://github.com/opencv/opencv_zoo/tree/master/models/face_detection_yunet')
 parser.add_argument('--face_recognition_model', '-fr', type=str, default='../models/face_recognition_sface_2021dec_int8.onnx', help='Path to the face recognition model. Download the model at https://github.com/opencv/opencv_zoo/tree/master/models/face_recognition_sface')
 parser.add_argument('--score_threshold', type=float, default=0.95, help='Filtering out faces of score < score_threshold.')
@@ -103,10 +103,11 @@ if __name__ == '__main__':
         deviceId = 0
     cap = cv2.VideoCapture(deviceId)
 
-    # Set the detector input size based on the video frame size.
-    frameWidth = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)*args.scale)
-    frameHeight = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)*args.scale)
+    # Set the desired frame size.
+    frameWidth = 640
+    frameHeight = 480
 
+    # Set the detector input size based on the video frame size.
     detector.setInputSize([frameWidth, frameHeight])
 
     # If a target image is specified, read it for facial recogition.
@@ -171,9 +172,7 @@ if __name__ == '__main__':
                 target_face_feature = recognizer.feature(target_face_align)
 
             cosine_similarity_threshold = 0.363
-            #l2_similarity_threshold = 1.128
-            l2_similarity_threshold = 1.3 # Changed threshold for demo script to be more lenient since the target
-                                          # image is a different image from the sample image (same person).
+            l2_similarity_threshold = 1.128
 
             # Feature match scores.
             #cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
