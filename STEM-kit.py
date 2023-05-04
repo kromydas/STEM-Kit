@@ -10,6 +10,7 @@
 import argparse
 import numpy as np
 import cv2
+import pyzbar.pyzbar as pyzbar
 import onnxruntime
 import kivy
 from kivy.clock import Clock
@@ -231,7 +232,7 @@ class QRCodeDecoderPopup(BasePopup):
 
         self.frame_count = 0
 
-    def process_image(self, dt, *args):
+    def process_image_cv2(self, dt, *args):
 
         frame = self.get_latest_frame()
         if frame is None:
@@ -255,6 +256,39 @@ class QRCodeDecoderPopup(BasePopup):
                     centroid = find_centroid_vertices(points)
                     draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
                                       font_scale=font_scale, font_thickness=font_thickness)
+
+            texture = self.convert_frame_to_texture(self, frame)
+            self.image.texture = texture
+
+
+    def process_image(self, dt, *args):
+
+        frame = self.get_latest_frame()
+        if frame is None:
+            return
+
+        else:
+
+            qcd = cv2.QRCodeDetector()
+
+            # Convert the current frame to grayscale and decode any found QR codes.
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            decoded = pyzbar.decode(gray)
+
+            for code in decoded:
+                # Extract bounding box location and size.
+                bbox = [x, y, w, h] = code.rect
+
+                # Draw bounding box rectangle around the QR code
+                cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+
+                # Get decoded text from the QR code
+                msg = code.data.decode('utf-8')
+
+                centroid = find_centroid_bbox(bbox)
+                draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+                                  font_scale=font_scale,
+                                  font_thickness=font_thickness)
 
             texture = self.convert_frame_to_texture(self, frame)
             self.image.texture = texture
