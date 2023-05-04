@@ -172,7 +172,8 @@ if __name__ == '__main__':
 
             cosine_similarity_threshold = 0.363
             #l2_similarity_threshold = 1.128
-            l2_similarity_threshold = 1.3
+            l2_similarity_threshold = 1.3 # Changed threshold for demo script to be more lenient since the target
+                                          # image is a different image from the sample image (same person).
 
             # Feature match scores.
             #cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
