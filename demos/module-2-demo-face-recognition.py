@@ -104,8 +104,8 @@ if __name__ == '__main__':
     cap = cv2.VideoCapture(deviceId)
 
     # Set the desired frame size.
-    frameWidth = 640
-    frameHeight = 480
+    frameWidth = 600
+    frameHeight = 350
 
     # Set the detector input size based on the video frame size.
     detector.setInputSize([frameWidth, frameHeight])
