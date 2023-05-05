@@ -173,7 +173,7 @@ if __name__ == '__main__':
                 target_face_feature = recognizer.feature(target_face_align)
 
             cosine_similarity_threshold = 0.363
-            l2_similarity_threshold = 1.128
+            l2_similarity_threshold = 1.3
 
             # Feature match scores.
             #cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
