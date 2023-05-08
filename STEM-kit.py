@@ -12,8 +12,11 @@ os.environ["KIVY_NO_ARGS"] = "1"
 import sys
 import numpy as np
 import cv2
-import pyzbar.pyzbar as pyzbar
+#import pyzbar.pyzbar as pyzbar
 import onnxruntime
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import img_to_array
+
 import kivy
 from kivy.clock import Clock
 from kivy.app import App
@@ -110,8 +113,8 @@ class MainLayout(BoxLayout):
         self.add_widget(self.modules_layout)
 
         button_names = [
-            "Module 1",
-            "Module 2",
+            "Edge Detection",
+            "Image Deblurring",
             "Face Recognition",
             "QR Code Decoder",
             "Module 5",
@@ -130,6 +133,7 @@ class MainLayout(BoxLayout):
         self.capture_thread = threading.Thread(target=self.capture_frames)
         self.capture_thread.daemon = True
         self.capture_thread.start()
+
     def capture_frames(self):
         while True:
             ret, frame = self.capture.read()
@@ -149,7 +153,9 @@ class MainLayout(BoxLayout):
         elif module_name == "Face Recognition":
             popup = FaceRecognitionPopup(self)
         elif module_name == "Image Deblurring":
-            popup = UnderConstructionPopup(self)
+            popup = DeblurringPopup(self)
+        elif module_name == "Edge Detection":
+            popup = EdgeDetectionPopup(self)
         else:
             # Add additional modules here
             popup = UnderConstructionPopup(self)
@@ -234,7 +240,8 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
+        # Clock.schedule_interval(self.process_image, 1.0 / 30.0)
+        Clock.schedule_interval(self.process_image_cv2, 1.0 / 30.0)
 
         self.frame_count = 0
 
@@ -245,7 +252,6 @@ class QRCodeDecoderPopup(BasePopup):
             return
 
         else:
-
             qcd = cv2.QRCodeDetector()
 
             # Convert the current frame to grayscale and decode any found QR codes.
@@ -267,6 +273,99 @@ class QRCodeDecoderPopup(BasePopup):
             self.image.texture = texture
 
 
+    # def process_image(self, dt, *args):
+    #
+    #     frame = self.get_latest_frame()
+    #     if frame is None:
+    #         return
+    #
+    #     else:
+    #
+    #         qcd = cv2.QRCodeDetector()
+    #
+    #         # Convert the current frame to grayscale and decode any found QR codes.
+    #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    #         decoded = pyzbar.decode(gray)
+    #
+    #         for code in decoded:
+    #             # Extract bounding box location and size.
+    #             bbox = [x, y, w, h] = code.rect
+    #
+    #             # Draw bounding box rectangle around the QR code
+    #             cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+    #
+    #             # Get decoded text from the QR code
+    #             msg = code.data.decode('utf-8')
+    #
+    #             centroid = find_centroid_bbox(bbox)
+    #             draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+    #                               font_scale=font_scale,
+    #                               font_thickness=font_thickness)
+    #
+    #         texture = self.convert_frame_to_texture(self, frame)
+    #         self.image.texture = texture
+
+class DeblurringPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(DeblurringPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Deblur Image"
+
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+        self.input_source = './input_media/image_1.jpg'
+        # self.image = Image(source='./input_media/license_plate.jpg', allow_stretch=True, size_hint_y=0.7)
+        self.image = Image(source=self.input_source, allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
+    # Function to visualize the Fast Fourier Transform of the blurred images.
+    def create_fft(self, img):
+        img = np.float32(img) / 255.0
+        f = np.fft.fft2(img)
+        fshift = np.fft.fftshift(f)
+        mag_spec = 20 * np.log(np.abs(fshift))
+        mag_spec = np.asarray(mag_spec, dtype=np.uint8)
+
+        return mag_spec
+
+    def process(self, ip_image, length, deblur_angle):
+        noise = 0.01
+        size = 200
+        length = int(length)
+        angle = (deblur_angle * np.pi) / 180
+
+        psf = np.ones((1, length), np.float32)  # base image for psf
+        costerm, sinterm = np.cos(angle), np.sin(angle)
+        Ang = np.float32([[-costerm, sinterm, 0], [sinterm, costerm, 0]])
+        size2 = size // 2
+        Ang[:, 2] = (size2, size2) - np.dot(Ang[:, :2], ((length - 1) * 0.5, 0))
+        psf = cv2.warpAffine(psf, Ang, (size, size), flags=cv2.INTER_CUBIC)  # Warp affine to get the desired psf
+
+        gray = ip_image
+        gray = np.float32(gray) / 255.0
+        gray_dft = cv2.dft(gray, flags=cv2.DFT_COMPLEX_OUTPUT)  # DFT of the image
+        psf /= psf.sum()  # Dividing by the sum
+        psf_mat = np.zeros_like(gray)
+        psf_mat[:size, :size] = psf
+        psf_dft = cv2.dft(psf_mat, flags=cv2.DFT_COMPLEX_OUTPUT)  # DFT of the psf
+        PSFsq = (psf_dft ** 2).sum(-1)
+        imgPSF = psf_dft / (PSFsq + noise)[..., np.newaxis]  # H in the equation for wiener deconvolution
+        gray_op = cv2.mulSpectrums(gray_dft, imgPSF, 0)
+        gray_res = cv2.idft(gray_op, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)  # Inverse DFT
+        gray_res = np.roll(gray_res, -size // 2, 0)
+        gray_res = np.roll(gray_res, -size // 2, 1)
+
+        return gray_res
+
     def process_image(self, dt, *args):
 
         frame = self.get_latest_frame()
@@ -275,28 +374,39 @@ class QRCodeDecoderPopup(BasePopup):
 
         else:
 
-            qcd = cv2.QRCodeDetector()
+            # Change this variable with the name of the trained models.
+            angle_model_name = './models/angle_model.hdf5'
+            length_model_name = './models/length_model.hdf5'
+            model1 = load_model(angle_model_name)
+            model2 = load_model(length_model_name)
 
-            # Convert the current frame to grayscale and decode any found QR codes.
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            decoded = pyzbar.decode(gray)
+            # read blurred image
+            ip_image = cv2.imread(self.input_source)
+            ip_image = cv2.cvtColor(ip_image, cv2.COLOR_BGR2GRAY)
+            ip_image = cv2.resize(ip_image, (640, 480))
+            # FFT visualization of the blurred image
+            # fft_img = self.create_fft(ip_image)
 
-            for code in decoded:
-                # Extract bounding box location and size.
-                bbox = [x, y, w, h] = code.rect
+            # Predicting the psf parameters of length and angle.
+            img = cv2.resize(self.create_fft(ip_image), (224, 224))
+            img = np.expand_dims(img_to_array(img), axis=0) / 255.0
+            preds = model1.predict(img)
+            # angle_value= np.sum(np.multiply(np.arange(0, 180), preds[0]))
+            angle_value = np.mean(np.argsort(preds[0])[-3:])
 
-                # Draw bounding box rectangle around the QR code
-                cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+            print("Predicted Blur Angle: ", angle_value)
+            length_value = model2.predict(img)[0][0]
+            print("Predicted Blur Length: ", length_value)
 
-                # Get decoded text from the QR code
-                msg = code.data.decode('utf-8')
+            op_image = self.process(ip_image, length_value, angle_value)
+            op_image = (op_image * 255).astype(np.uint8)
+            op_image = (255 / (np.max(op_image) - np.min(op_image))) * (op_image - np.min(op_image))
 
-                centroid = find_centroid_bbox(bbox)
-                draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
-                                  font_scale=font_scale,
-                                  font_thickness=font_thickness)
+            cv2.imwrite("result_new.png", op_image)
 
-            texture = self.convert_frame_to_texture(self, frame)
+            op_image = cv2.imread('./result_new.png')
+
+            texture = self.convert_frame_to_texture(self, op_image)
             self.image.texture = texture
 
 class FaceRecognitionPopup(BasePopup):
@@ -438,9 +548,9 @@ class FaceRecognitionPopup(BasePopup):
                 self.image.texture = texture
 
 
-class CannyPopup(BasePopup):
+class EdgeDetectionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
-        super(CannyPopup, self).__init__(main_layout, **kwargs)
+        super(EdgeDetectionPopup, self).__init__(main_layout, **kwargs)
         self.title = "Canny Edge Detection"
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
@@ -451,7 +561,7 @@ class CannyPopup(BasePopup):
         slider1_layout, self.lower_threshold_slider = self.create_labeled_slider("Lower Threshold: ", 0, 255, 100)
         slider2_layout, self.upper_threshold_slider = self.create_labeled_slider("Upper Threshold: ", 0, 255, 200)
 
-        slider_box = BoxLayout(orientation="vertical", size_hint_y=0.1)
+        slider_box = BoxLayout(orientation="vertical", size_hint_y=0.2)
         self.content.add_widget(slider_box)
         slider_box.add_widget(slider1_layout)
         slider_box.add_widget(slider2_layout)
@@ -463,19 +573,21 @@ class CannyPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        self.process_button = Button(text="Process image")
-        self.process_button.bind(on_press=self.process_image)
-        button_layout.add_widget(self.process_button)
+        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
+
+        self.frame_count = 0
 
     def process_image(self, *args):
-        ret, frame = self.capture.read()
 
-        if ret:
+        frame = self.get_latest_frame()
+        if frame is None:
+            return
+        else:
             lower_threshold = self.lower_threshold_slider.value
             upper_threshold = self.upper_threshold_slider.value
             edge_frame = self.apply_canny_edge_detection(frame, lower_threshold, upper_threshold)
             colored_edge_frame = cv2.cvtColor(edge_frame, cv2.COLOR_GRAY2BGR)
-            texture = self.convert_frame_to_texture(colored_edge_frame)
+            texture = self.convert_frame_to_texture(self, colored_edge_frame)
             self.image.texture = texture
 
     @staticmethod
