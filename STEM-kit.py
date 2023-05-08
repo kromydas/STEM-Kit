@@ -181,7 +181,7 @@ class BasePopup(Popup):
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
         return texture
 
-    def create_labeled_slider(self, label_text, min_value, max_value, initial_value, value_format='{}', size_hint_label=.4):
+    def create_labeled_slider(self, label_text, min_value, max_value, initial_value, value_format='{}', rounding=None, size_hint_label=.4):
         layout = BoxLayout(orientation="horizontal", size_hint_y=None, height="30dp")
 
         label = Label(text=label_text, size_hint_x=size_hint_label)
@@ -192,7 +192,13 @@ class BasePopup(Popup):
 
         value_label = Label(text=value_format.format(initial_value), size_hint_x=0.1)
         layout.add_widget(value_label)
-        slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(value)))
+
+        # # slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(value)))
+        # slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(
+        #     round(value, rounding) if rounding is not None else value)))
+
+        slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(
+            round(value, rounding) if rounding is not None else int(value))))
 
         return layout, slider
 
@@ -311,8 +317,7 @@ class DeblurringPopup(BasePopup):
         self.title = "Deblur Image"
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-        self.input_source = './input_media/image_1.jpg'
-        # self.image = Image(source='./input_media/license_plate.jpg', allow_stretch=True, size_hint_y=0.7)
+        self.input_source = './input_media/license_plate.jpg'
         self.image = Image(source=self.input_source, allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
@@ -375,8 +380,8 @@ class DeblurringPopup(BasePopup):
         else:
 
             # Change this variable with the name of the trained models.
-            angle_model_name = './models/angle_model.hdf5'
-            length_model_name = './models/length_model.hdf5'
+            angle_model_name = './models/deblurring_angle_model.hdf5'
+            length_model_name = './models/deblurring_length_model.hdf5'
             model1 = load_model(angle_model_name)
             model2 = load_model(length_model_name)
 
@@ -423,7 +428,7 @@ class FaceRecognitionPopup(BasePopup):
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
-        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10, value_format='{:.2f}', size_hint_label=0.4)
+        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10, value_format='{:.2f}', rounding=2, size_hint_label=0.4)
 
         slider_box = BoxLayout(size_hint_y=0.05)
         self.content.add_widget(slider_box)
@@ -558,8 +563,8 @@ class EdgeDetectionPopup(BasePopup):
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
-        slider1_layout, self.lower_threshold_slider = self.create_labeled_slider("Lower Threshold: ", 0, 255, 100)
-        slider2_layout, self.upper_threshold_slider = self.create_labeled_slider("Upper Threshold: ", 0, 255, 200)
+        slider1_layout, self.lower_threshold_slider = self.create_labeled_slider("Lower Threshold: ", 0, 255, 100, value_format='{}', rounding=0)
+        slider2_layout, self.upper_threshold_slider = self.create_labeled_slider("Upper Threshold: ", 0, 255, 200, value_format='{}', rounding=0)
 
         slider_box = BoxLayout(orientation="vertical", size_hint_y=0.2)
         self.content.add_widget(slider_box)
