@@ -21,6 +21,7 @@ from tensorflow.keras.preprocessing.image import img_to_array
 import kivy
 from kivy.clock import Clock
 from kivy.app import App
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.slider import Slider
@@ -189,19 +190,19 @@ class BasePopup(Popup):
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
         return texture
 
-    def create_labeled_slider(self, label_text, min_value, max_value, initial_value, value_format='{}', rounding=None, size_hint_label=.4):
-        layout = BoxLayout(orientation="horizontal", size_hint_y=None, height="30dp")
+    def create_labeled_slider(self, label_text, min_value, max_value, initial_value, value_format='{}', rounding=None,
+                              size_hint_label=.4, font_size=24):
+        layout = BoxLayout(orientation="vertical", size_hint_x=None, width="30dp")
 
-        label = Label(text=label_text, size_hint_x=size_hint_label)
+        label = Label(text=label_text, size_hint_y=size_hint_label, font_size=font_size)
         layout.add_widget(label)
 
-        slider = Slider(min=min_value, max=max_value, value=initial_value, size_hint_x=0.5)
+        slider = Slider(min=min_value, max=max_value, value=initial_value, orientation='vertical', size_hint_y=0.5)
         layout.add_widget(slider)
 
-        value_label = Label(text=value_format.format(initial_value), size_hint_x=0.1)
+        value_label = Label(text=value_format.format(initial_value), size_hint_y=0.1, font_size=font_size)
         layout.add_widget(value_label)
 
-        # slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(value)))
         slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(
             round(value, rounding) if rounding is not None else int(value))))
 
@@ -451,33 +452,36 @@ class DeblurringPopup(BasePopup):
             self.image.texture = texture_result
             return False  # This stops the function from being called again.
 
+
 class FaceRecognitionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(FaceRecognitionPopup, self).__init__(main_layout, **kwargs)
         self.title = "Facial Recognition"
 
-        self.face_detetcion_model   = './models/face_detection_yunet_2022mar_int8.onnx'
+        self.face_detetcion_model = './models/face_detection_yunet_2022mar_int8.onnx'
         self.face_recognition_model = './models/face_recognition_sface_2021dec_int8.onnx'
-        self.target_image           = './input_media/target_image.png'
+        self.target_image = './input_media/target_image.png'
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
-        self.image = Image(allow_stretch=True, size_hint_y=0.7)
-        self.content.add_widget(self.image)
-
-        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10, value_format='{:.2f}', rounding=2, size_hint_label=0.4)
-
-        slider_box = BoxLayout(size_hint_y=0.05)
-        self.content.add_widget(slider_box)
+        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10,
+                                                                value_format='{:.2f}', rounding=2, size_hint_label=0.4)
+        slider_box = AnchorLayout(anchor_x='center', anchor_y='center', size_hint=(0.25, 1))
         slider_box.add_widget(slider_layout)
 
-        button_layout = BoxLayout(size_hint_y=0.1)
-        self.content.add_widget(button_layout)
+        image_and_buttons_box = BoxLayout(orientation="horizontal")
+        image_and_buttons_box.add_widget(slider_box)
 
-        self.close_button = Button(text="Close")
+        self.image = Image(allow_stretch=True, size_hint_y=0.75)
+        image_box = BoxLayout(orientation="vertical")
+        image_box.add_widget(self.image)
+        image_and_buttons_box.add_widget(image_box)
+
+        self.content.add_widget(image_and_buttons_box)
+
+        self.close_button = Button(text="Close", size_hint_y=0.1)
         self.close_button.bind(on_press=self.close_popup)
-        button_layout.add_widget(self.close_button)
-
+        self.content.add_widget(self.close_button)
         Clock.schedule_interval(self.process_image, 1.0 / 30.0)
 
     def visualize(self, input, faces, thickness=2):
@@ -596,17 +600,28 @@ class EdgeDetectionPopup(BasePopup):
         self.title = "Canny Edge Detection"
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+        video_and_controls = BoxLayout(orientation="horizontal")
 
-        self.image = Image(allow_stretch=True, size_hint_y=0.7)
-        self.content.add_widget(self.image)
+        sliders_layout = BoxLayout(orientation="horizontal", size_hint_x=0.25, padding=[10, 0])
 
-        slider1_layout, self.lower_threshold_slider = self.create_labeled_slider("Lower Threshold: ", 0, 255, 100, value_format='{}', rounding=0)
-        slider2_layout, self.upper_threshold_slider = self.create_labeled_slider("Upper Threshold: ", 0, 255, 200, value_format='{}', rounding=0)
+        slider1_layout, self.lower_threshold_slider = self.create_labeled_slider("Lower T: ", 0, 255, 100,
+                                                                                 value_format='{}', rounding=0)
+        slider1_box = AnchorLayout(anchor_x='center', anchor_y='center')
+        slider1_box.add_widget(slider1_layout)
+        sliders_layout.add_widget(slider1_box)
 
-        slider_box = BoxLayout(orientation="vertical", size_hint_y=0.2)
-        self.content.add_widget(slider_box)
-        slider_box.add_widget(slider1_layout)
-        slider_box.add_widget(slider2_layout)
+        slider2_layout, self.upper_threshold_slider = self.create_labeled_slider("Upper T: ", 0, 255, 200,
+                                                                                 value_format='{}', rounding=0)
+        slider2_box = AnchorLayout(anchor_x='center', anchor_y='center')
+        slider2_box.add_widget(slider2_layout)
+        sliders_layout.add_widget(slider2_box)
+
+        video_and_controls.add_widget(sliders_layout)
+
+        self.image = Image(allow_stretch=True, size_hint_x=0.8)
+        video_and_controls.add_widget(self.image)
+
+        self.content.add_widget(video_and_controls)
 
         button_layout = BoxLayout(size_hint_y=0.1)
         self.content.add_widget(button_layout)
