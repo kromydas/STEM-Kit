@@ -36,6 +36,12 @@ import queue
 
 kivy.require("2.0.0")
 
+# Change this variable with the name of the trained models.
+angle_model_name = './models/deblurring_angle_model.hdf5'
+length_model_name = './models/deblurring_length_model.hdf5'
+model_angle = load_model(angle_model_name)
+model_length = load_model(length_model_name)
+
 def parse_command_line_args():
     mode = "SK"
     for i, arg in enumerate(sys.argv):
@@ -335,19 +341,9 @@ class DeblurringPopup(BasePopup):
         self.load_button.bind(on_press=self.load_image)
         button_layout.add_widget(self.load_button)
 
-        # self.process_button = Button(text="Process image")
-        # self.process_button.bind(on_press=self.start_image_processing)
-        # button_layout.add_widget(self.process_button)
-
         self.process_button = Button(text="Process image")
         self.process_button.bind(on_press=self.process_image)  # Changed from start_image_processing
         button_layout.add_widget(self.process_button)
-
-        # Change this variable with the name of the trained models.
-        self.angle_model_name = './models/deblurring_angle_model.hdf5'
-        self.length_model_name = './models/deblurring_length_model.hdf5'
-        self.model_angle = load_model(self.angle_model_name)
-        self.model_length = load_model(self.length_model_name)
 
     def load_image(self, instance):
         if len(self.filechooser.selection) > 0:
@@ -417,12 +413,12 @@ class DeblurringPopup(BasePopup):
             # Predicting the psf parameters of length and angle.
             img = cv2.resize(self.create_fft(ip_image), (224, 224))
             img = np.expand_dims(img_to_array(img), axis=0) / 255.0
-            preds = self.model_angle.predict(img)
+            preds = model_angle.predict(img)
             # angle_value= np.sum(np.multiply(np.arange(0, 180), preds[0]))
             angle_value = np.mean(np.argsort(preds[0])[-3:])
 
             print("Predicted Blur Angle: ", angle_value)
-            length_value = self.model_length.predict(img)[0][0]
+            length_value = model_length.predict(img)[0][0]
             print("Predicted Blur Length: ", length_value)
 
             op_image = self.process(ip_image, length_value, angle_value)
