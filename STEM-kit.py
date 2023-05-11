@@ -321,17 +321,17 @@ class DeblurringPopup(BasePopup):
         super(DeblurringPopup, self).__init__(main_layout, **kwargs)
         self.title = "Deblur Image"
 
-        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+        self.content = BoxLayout(orientation="horizontal",
+                                 spacing=layout_padding_y)  # Changed orientation to "horizontal"
         self.input_source = None
-        self.image = Image(source=self.input_source, allow_stretch=True, size_hint_y=0.6)
-        self.content.add_widget(self.image)
 
-        self.filechooser = FileChooserListView(path='/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/module-3-blurry-license-plates/cropped', size_hint_y=0.3)
-        # self.filechooser = FileChooserListView(path='/Users/media', size_hint_y=0.3)
-        self.content.add_widget(self.filechooser)
+        # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons
+        self.image_and_buttons = BoxLayout(orientation="vertical", size_hint_x=0.65)
+        self.image = Image(source=self.input_source, allow_stretch=True)
+        self.image_and_buttons.add_widget(self.image)
 
         button_layout = BoxLayout(size_hint_y=0.1)
-        self.content.add_widget(button_layout)
+        self.image_and_buttons.add_widget(button_layout)
 
         self.close_button = Button(text="Close")
         self.close_button.bind(on_press=self.close_popup)
@@ -342,8 +342,15 @@ class DeblurringPopup(BasePopup):
         button_layout.add_widget(self.load_button)
 
         self.process_button = Button(text="Process image")
-        self.process_button.bind(on_press=self.process_image)  # Changed from start_image_processing
+        self.process_button.bind(on_press=self.process_image)
         button_layout.add_widget(self.process_button)
+
+        self.filechooser = FileChooserListView(
+            path='/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/License-Plates',
+            size_hint_x=0.35)
+        self.content.add_widget(self.filechooser)
+
+        self.content.add_widget(self.image_and_buttons)
 
     def load_image(self, instance):
         if len(self.filechooser.selection) > 0:
@@ -653,7 +660,7 @@ class STEMKitv1App(App):
         if (mode == 'LT'):
             Window.size = (800, 600)
         else:
-            Window.size = (500, 400)
+            Window.size = (600, 400)
         return MainLayout()
 
     def on_stop(self):
