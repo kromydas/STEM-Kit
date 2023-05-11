@@ -32,16 +32,22 @@ from kivy.uix.label import Label
 from kivy.graphics.texture import Texture
 from kivy.core.window import Window
 from kivy.uix.filechooser import FileChooserIconView, FileChooserListView
+from kivy.lang import Builder
 import threading
 import queue
 
 kivy.require("2.0.0")
+
+# Builder.load_file('./STEM-Kit.kv')
 
 # Change this variable with the name of the trained models.
 angle_model_name = './models/deblurring_angle_model.hdf5'
 length_model_name = './models/deblurring_length_model.hdf5'
 model_angle = load_model(angle_model_name)
 model_length = load_model(length_model_name)
+
+class NewFileChooser(FileChooserListView):
+    pass
 
 def parse_command_line_args():
     mode = "SK"
@@ -54,11 +60,13 @@ def parse_command_line_args():
 mode = parse_command_line_args()
 if mode == 'SK':
     # STEM-Kit run mode (default).
-    Window.left = 140  # horizontal position
-    Window.top = 30  # vertical position (distance from the top of the screen)
+    Window.left = 100  # horizontal position
+    Window.top = 10  # vertical position (distance from the top of the screen)
     font_scale = 0.8
     font_thickness = 2
     layout_padding_y = 25
+    font_size_slider = 12
+    default_media_path = '/media/pi'
 else:
     # Laptop run mode.
     Window.left = 450  # horizontal position
@@ -66,6 +74,8 @@ else:
     font_scale = .9
     font_thickness = 2
     layout_padding_y = 40
+    font_size_slider = 24
+    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/License-Plates'
 
 def find_centroid_bbox(bbox):
     '''
@@ -327,7 +337,7 @@ class DeblurringPopup(BasePopup):
         self.input_source = None
 
         # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons
-        self.image_and_buttons = BoxLayout(orientation="vertical", size_hint_x=0.65)
+        self.image_and_buttons = BoxLayout(orientation="vertical", size_hint_x=0.6)
         self.image = Image(source=self.input_source, allow_stretch=True)
         self.image_and_buttons.add_widget(self.image)
 
@@ -347,8 +357,8 @@ class DeblurringPopup(BasePopup):
         button_layout.add_widget(self.process_button)
 
         self.filechooser = FileChooserListView(
-            path='/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/License-Plates',
-            size_hint_x=0.35)
+            path=default_media_path,
+            size_hint_x=0.4)
         self.content.add_widget(self.filechooser)
 
         self.content.add_widget(self.image_and_buttons)
@@ -365,7 +375,6 @@ class DeblurringPopup(BasePopup):
         fshift = np.fft.fftshift(f)
         mag_spec = 20 * np.log(np.abs(fshift))
         mag_spec = np.asarray(mag_spec, dtype=np.uint8)
-
         return mag_spec
 
     def process(self, ip_image, length, deblur_angle):
@@ -398,8 +407,6 @@ class DeblurringPopup(BasePopup):
         return gray_res
 
     def process_image(self, instance):
-        # Call the threaded image processing function here
-        # threading.Thread(target=self.process_image_thread).start()
         Clock.schedule_once(self.process_image_thread, 0)
 
     def process_image_thread(self, dt, *args):
@@ -434,10 +441,13 @@ class DeblurringPopup(BasePopup):
             op_image = (255 / (np.max(op_image) - np.min(op_image))) * (op_image - np.min(op_image))
 
             op_image_path = './result_new.png'
-
+            #------------------------------------------------------------------
+            # Passing the  op_image directly to convert_frame_to_texture() does
+            # not work for some reason. The displayed image is garbage. This
+            # hack works for now to write/read the output image and then pass
+            # it to convert_frame_to_texture().
+            #------------------------------------------------------------------
             cv2.imwrite(op_image_path, op_image)
-
-
             op_image = cv2.imread(op_image_path)
 
             # After processing, convert the output image to a texture.
@@ -465,14 +475,14 @@ class FaceRecognitionPopup(BasePopup):
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
         slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10,
-                                                                value_format='{:.2f}', rounding=2, size_hint_label=0.4)
-        slider_box = AnchorLayout(anchor_x='center', anchor_y='center', size_hint=(0.25, 1))
+                                                                value_format='{:.2f}', rounding=2, size_hint_label=0.4, font_size=font_size_slider)
+        slider_box = AnchorLayout(anchor_x='center', anchor_y='center', size_hint=(0.35, 1))
         slider_box.add_widget(slider_layout)
 
         image_and_buttons_box = BoxLayout(orientation="horizontal")
         image_and_buttons_box.add_widget(slider_box)
 
-        self.image = Image(allow_stretch=True, size_hint_y=0.75)
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
         image_box = BoxLayout(orientation="vertical")
         image_box.add_widget(self.image)
         image_and_buttons_box.add_widget(image_box)
@@ -602,16 +612,16 @@ class EdgeDetectionPopup(BasePopup):
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
         video_and_controls = BoxLayout(orientation="horizontal")
 
-        sliders_layout = BoxLayout(orientation="horizontal", size_hint_x=0.25, padding=[10, 0])
+        sliders_layout = BoxLayout(orientation="horizontal", size_hint_x=0.2, padding=[10, 0])
 
         slider1_layout, self.lower_threshold_slider = self.create_labeled_slider("Lower T: ", 0, 255, 100,
-                                                                                 value_format='{}', rounding=0)
+                                                                                 value_format='{}', rounding=0, font_size=font_size_slider)
         slider1_box = AnchorLayout(anchor_x='center', anchor_y='center')
         slider1_box.add_widget(slider1_layout)
         sliders_layout.add_widget(slider1_box)
 
         slider2_layout, self.upper_threshold_slider = self.create_labeled_slider("Upper T: ", 0, 255, 200,
-                                                                                 value_format='{}', rounding=0)
+                                                                                 value_format='{}', rounding=0, font_size=font_size_slider)
         slider2_box = AnchorLayout(anchor_x='center', anchor_y='center')
         slider2_box.add_widget(slider2_layout)
         sliders_layout.add_widget(slider2_box)
@@ -675,12 +685,15 @@ class STEMKitv1App(App):
         if (mode == 'LT'):
             Window.size = (800, 600)
         else:
-            Window.size = (600, 400)
+            Window.size = (620, 420)
+        # layout = BoxLayout()
+        # filechooser = NewFileChooser()
+        # layout.add_widget(filechooser)
         return MainLayout()
 
     def on_stop(self):
         self.root.on_stop()
 
 if __name__ == "__main__":
-
+    # Builder.load_file('./STEM-Kit.kv')
     STEMKitv1App().run()
