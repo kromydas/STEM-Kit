@@ -10,6 +10,7 @@ import os
 os.environ["KIVY_NO_ARGS"] = "1"
 
 import sys
+import time
 import numpy as np
 import cv2
 #import pyzbar.pyzbar as pyzbar
@@ -29,6 +30,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.label import Label
 from kivy.graphics.texture import Texture
 from kivy.core.window import Window
+from kivy.uix.filechooser import FileChooserIconView, FileChooserListView
 import threading
 import queue
 
@@ -193,10 +195,7 @@ class BasePopup(Popup):
         value_label = Label(text=value_format.format(initial_value), size_hint_x=0.1)
         layout.add_widget(value_label)
 
-        # # slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(value)))
-        # slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(
-        #     round(value, rounding) if rounding is not None else value)))
-
+        # slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(value)))
         slider.bind(value=lambda instance, value: setattr(value_label, 'text', value_format.format(
             round(value, rounding) if rounding is not None else int(value))))
 
@@ -317,9 +316,13 @@ class DeblurringPopup(BasePopup):
         self.title = "Deblur Image"
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-        self.input_source = './input_media/license_plate.jpg'
-        self.image = Image(source=self.input_source, allow_stretch=True, size_hint_y=0.7)
+        self.input_source = None
+        self.image = Image(source=self.input_source, allow_stretch=True, size_hint_y=0.6)
         self.content.add_widget(self.image)
+
+        self.filechooser = FileChooserListView(path='/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/module-3-blurry-license-plates/cropped', size_hint_y=0.3)
+        # self.filechooser = FileChooserListView(path='/Users/media', size_hint_y=0.3)
+        self.content.add_widget(self.filechooser)
 
         button_layout = BoxLayout(size_hint_y=0.1)
         self.content.add_widget(button_layout)
@@ -328,9 +331,28 @@ class DeblurringPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
+        self.load_button = Button(text="Load Image")
+        self.load_button.bind(on_press=self.load_image)
+        button_layout.add_widget(self.load_button)
+
+        # self.process_button = Button(text="Process image")
+        # self.process_button.bind(on_press=self.start_image_processing)
+        # button_layout.add_widget(self.process_button)
+
         self.process_button = Button(text="Process image")
-        self.process_button.bind(on_press=self.process_image)
+        self.process_button.bind(on_press=self.process_image)  # Changed from start_image_processing
         button_layout.add_widget(self.process_button)
+
+        # Change this variable with the name of the trained models.
+        self.angle_model_name = './models/deblurring_angle_model.hdf5'
+        self.length_model_name = './models/deblurring_length_model.hdf5'
+        self.model_angle = load_model(self.angle_model_name)
+        self.model_length = load_model(self.length_model_name)
+
+    def load_image(self, instance):
+        if len(self.filechooser.selection) > 0:
+            self.input_source = self.filechooser.selection[0]
+            self.image.source = self.input_source
 
     # Function to visualize the Fast Fourier Transform of the blurred images.
     def create_fft(self, img):
@@ -371,20 +393,20 @@ class DeblurringPopup(BasePopup):
 
         return gray_res
 
-    def process_image(self, dt, *args):
+    def process_image(self, instance):
+        # Call the threaded image processing function here
+        # threading.Thread(target=self.process_image_thread).start()
+        Clock.schedule_once(self.process_image_thread, 0)
+
+    def process_image_thread(self, dt, *args):
+
+        global texture_result
+        texture_result = None  # Reset to None before processing starts
 
         frame = self.get_latest_frame()
         if frame is None:
             return
-
         else:
-
-            # Change this variable with the name of the trained models.
-            angle_model_name = './models/deblurring_angle_model.hdf5'
-            length_model_name = './models/deblurring_length_model.hdf5'
-            model1 = load_model(angle_model_name)
-            model2 = load_model(length_model_name)
-
             # read blurred image
             ip_image = cv2.imread(self.input_source)
             ip_image = cv2.cvtColor(ip_image, cv2.COLOR_BGR2GRAY)
@@ -395,24 +417,36 @@ class DeblurringPopup(BasePopup):
             # Predicting the psf parameters of length and angle.
             img = cv2.resize(self.create_fft(ip_image), (224, 224))
             img = np.expand_dims(img_to_array(img), axis=0) / 255.0
-            preds = model1.predict(img)
+            preds = self.model_angle.predict(img)
             # angle_value= np.sum(np.multiply(np.arange(0, 180), preds[0]))
             angle_value = np.mean(np.argsort(preds[0])[-3:])
 
             print("Predicted Blur Angle: ", angle_value)
-            length_value = model2.predict(img)[0][0]
+            length_value = self.model_length.predict(img)[0][0]
             print("Predicted Blur Length: ", length_value)
 
             op_image = self.process(ip_image, length_value, angle_value)
             op_image = (op_image * 255).astype(np.uint8)
             op_image = (255 / (np.max(op_image) - np.min(op_image))) * (op_image - np.min(op_image))
 
-            cv2.imwrite("result_new.png", op_image)
+            op_image_path = './result_new.png'
 
-            op_image = cv2.imread('./result_new.png')
+            cv2.imwrite(op_image_path, op_image)
 
-            texture = self.convert_frame_to_texture(self, op_image)
-            self.image.texture = texture
+
+            op_image = cv2.imread(op_image_path)
+
+            # After processing, convert the output image to a texture.
+            texture_result = self.convert_frame_to_texture(self, op_image)
+
+            # Schedule a function to be called every frame until texture_result is not None.
+            Clock.schedule_interval(self.update_image_texture, 0)
+
+    def update_image_texture(self, dt):
+        global texture_result
+        if texture_result is not None:
+            self.image.texture = texture_result
+            return False  # This stops the function from being called again.
 
 class FaceRecognitionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -618,7 +652,7 @@ class UnderConstructionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-class STEMKitApp(App):
+class STEMKitv1App(App):
     def build(self):
         if (mode == 'LT'):
             Window.size = (800, 600)
@@ -631,4 +665,4 @@ class STEMKitApp(App):
 
 if __name__ == "__main__":
 
-    STEMKitApp().run()
+    STEMKitv1App().run()
