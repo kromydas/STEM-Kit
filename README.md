@@ -1,0 +1,3 @@
+# STEM-Kit
+
+This project consists of a Kivy user interface that includes several embedded computer vision applications based on OpenCV. The GUI and the embedded applications can be executed on most platforms that have an appropriate python environment installed. The intended target platform is a Raspberry Pi (Model 4B). The Raspberry Pi is configured in a Pelican case and is referred to as a "STEM-Kit." The STEM-kit loaded with this Kivy application will support live "Escape Room" events in which students use the computer vision applications to solve puzzles to navigate their way through a series of rooms in a large warehouse. 
