@@ -474,7 +474,7 @@ class FaceRecognitionPopup(BasePopup):
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
-        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.10,
+        slider_layout, self.slider = self.create_labeled_slider("Similarity Threshold: ", 1.00, 1.30, 1.20,
                                                                 value_format='{:.2f}', rounding=2, size_hint_label=0.4, font_size=font_size_slider)
         slider_box = AnchorLayout(anchor_x='center', anchor_y='center', size_hint=(0.35, 1))
         slider_box.add_widget(slider_layout)
