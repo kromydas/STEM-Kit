@@ -858,9 +858,6 @@ class OCRTranslationPopup(BasePopup):
             # ocr_result = recognizeTranslateText(frame, src='de')
             op_image = self.recognizeTranslateText(ip_image, src='ru')
 
-            # texture = self.convert_frame_to_texture(frame)
-            # self.image.texture = texture
-
             # After processing, convert the output image to a texture.
             texture_result = self.convert_frame_to_texture(op_image)
 
