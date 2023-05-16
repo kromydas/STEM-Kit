@@ -39,13 +39,13 @@ import queue
 
 kivy.require("2.0.0")
 
-# Builder.load_file('./STEM-Kit.kv')
-
 # Change this variable with the name of the trained models.
 angle_model_name = './models/deblurring_angle_model.hdf5'
 length_model_name = './models/deblurring_length_model.hdf5'
 model_angle = load_model(angle_model_name)
 model_length = load_model(length_model_name)
+
+frame_rate = 1./15.
 
 class NewFileChooser(FileChooserListView):
     pass
@@ -76,7 +76,7 @@ else:
     font_thickness = 2
     layout_padding_y = 40
     font_size_slider = 24
-    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/License-Plates'
+    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/'
 
 def find_centroid_bbox(bbox):
     '''
@@ -149,14 +149,16 @@ class MainLayout(BoxLayout):
             self.modules_layout.add_widget(btn)
 
         self.capture = cv2.VideoCapture(0)
-        self.frame_queue = queue.Queue(maxsize=5)
+        self.frame_queue = queue.Queue(maxsize=1)
         self.capture_thread = threading.Thread(target=self.capture_frames)
         self.capture_thread.daemon = True
         self.capture_thread.start()
 
     def capture_frames(self):
+
         while True:
             ret, frame = self.capture.read()
+
             if not ret:
                 break
 
@@ -164,6 +166,9 @@ class MainLayout(BoxLayout):
                 self.frame_queue.get()
 
             self.frame_queue.put(frame)
+            # Reset the frame counter
+            self.frame_counter = 0
+
 
     def open_module_popup(self, instance):
         module_name = instance.text
@@ -196,7 +201,6 @@ class BasePopup(Popup):
     def close_popup(self, *args):
         self.dismiss()
 
-    @staticmethod
     def convert_frame_to_texture(self, frame):
         buf = cv2.flip(frame, 0).tostring()
         texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
@@ -223,8 +227,7 @@ class BasePopup(Popup):
 
     def create_base_widgets(self):
         self.content = BoxLayout(orientation="vertical")
-        # self.add_widget(self.content)
-        self.add(self.content)
+        self.add_widget(self.content)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
@@ -266,8 +269,8 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        # Clock.schedule_interval(self.process_image, 1.0 / 30.0)
-        Clock.schedule_interval(self.process_image_cv2, 1.0 / 30.0)
+        # Clock.schedule_interval(self.process_image, frame_rate)
+        Clock.schedule_interval(self.process_image_cv2, frame_rate)
 
         self.frame_count = 0
 
@@ -295,7 +298,7 @@ class QRCodeDecoderPopup(BasePopup):
                     draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
                                       font_scale=font_scale, font_thickness=font_thickness)
 
-            texture = self.convert_frame_to_texture(self, frame)
+            texture = self.convert_frame_to_texture(frame)
             self.image.texture = texture
 
 
@@ -328,7 +331,7 @@ class QRCodeDecoderPopup(BasePopup):
     #                               font_scale=font_scale,
     #                               font_thickness=font_thickness)
     #
-    #         texture = self.convert_frame_to_texture(self, frame)
+    #         texture = self.convert_frame_to_texture(frame)
     #         self.image.texture = texture
 
 class DeblurringPopup(BasePopup):
@@ -455,7 +458,7 @@ class DeblurringPopup(BasePopup):
             op_image = cv2.imread(op_image_path)
 
             # After processing, convert the output image to a texture.
-            texture_result = self.convert_frame_to_texture(self, op_image)
+            texture_result = self.convert_frame_to_texture(op_image)
 
             # Schedule a function to be called every frame until texture_result is not None.
             Clock.schedule_interval(self.update_image_texture, 0)
@@ -472,6 +475,7 @@ class FaceRecognitionPopup(BasePopup):
         super(FaceRecognitionPopup, self).__init__(main_layout, **kwargs)
         self.title = "Facial Recognition"
 
+        # These models load fast, so ok here on start-up.
         self.face_detetcion_model = './models/face_detection_yunet_2022mar_int8.onnx'
         self.face_recognition_model = './models/face_recognition_sface_2021dec_int8.onnx'
         self.target_image = './input_media/target_image.png'
@@ -496,7 +500,7 @@ class FaceRecognitionPopup(BasePopup):
         self.close_button = Button(text="Close", size_hint_y=0.1)
         self.close_button.bind(on_press=self.close_popup)
         self.content.add_widget(self.close_button)
-        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
+        Clock.schedule_interval(self.process_image, frame_rate)
 
     def visualize(self, input, faces, thickness=2):
         if faces[1] is not None:
@@ -564,7 +568,7 @@ class FaceRecognitionPopup(BasePopup):
                                   font_scale=font_scale, font_thickness=font_thickness)
                 skip_frame = True
 
-                texture = self.convert_frame_to_texture(self, frame)
+                texture = self.convert_frame_to_texture(frame)
                 self.image.texture = texture
 
             if skip_frame == False:
@@ -604,7 +608,7 @@ class FaceRecognitionPopup(BasePopup):
                     draw_label_banner(frame, msg, centroid, font_color=(0, 0, 255), fill_color=(0, 0, 0),
                                       font_scale=font_scale, font_thickness=font_thickness)
 
-                texture = self.convert_frame_to_texture(self, frame)
+                texture = self.convert_frame_to_texture(frame)
                 self.image.texture = texture
 
 
@@ -644,7 +648,7 @@ class EdgeDetectionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
+        Clock.schedule_interval(self.process_image, frame_rate)
 
         self.frame_count = 0
 
@@ -658,7 +662,7 @@ class EdgeDetectionPopup(BasePopup):
             upper_threshold = self.upper_threshold_slider.value
             edge_frame = self.apply_canny_edge_detection(frame, lower_threshold, upper_threshold)
             colored_edge_frame = cv2.cvtColor(edge_frame, cv2.COLOR_GRAY2BGR)
-            texture = self.convert_frame_to_texture(self, colored_edge_frame)
+            texture = self.convert_frame_to_texture(colored_edge_frame)
             self.image.texture = texture
 
     @staticmethod
@@ -666,59 +670,99 @@ class EdgeDetectionPopup(BasePopup):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return cv2.Canny(gray, lower_threshold, upper_threshold)
 
+
 class OCRTranslationPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(OCRTranslationPopup, self).__init__(main_layout, **kwargs)
         self.title = "OCR + Translation"
 
-        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+        self.content = BoxLayout(orientation="horizontal",
+                                 spacing=layout_padding_y)  # Changed orientation to "horizontal"
+        self.input_source = None
 
-        self.image = Image(allow_stretch=True, size_hint_y=0.7)
-        self.content.add_widget(self.image)
+        # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons
+        self.image_and_buttons = BoxLayout(orientation="vertical", size_hint_x=0.6)
+        self.image = Image(source=self.input_source, allow_stretch=True)
+        self.image_and_buttons.add_widget(self.image)
 
         button_layout = BoxLayout(size_hint_y=0.1)
-        self.content.add_widget(button_layout)
+        self.image_and_buttons.add_widget(button_layout)
 
         self.close_button = Button(text="Close")
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
+        self.load_button = Button(text="Load Image")
+        self.load_button.bind(on_press=self.load_image)
+        button_layout.add_widget(self.load_button)
+
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
+        self.filechooser = FileChooserListView(
+            path=default_media_path,
+            size_hint_x=0.4)
+        self.content.add_widget(self.filechooser)
+
+        self.content.add_widget(self.image_and_buttons)
+
         # Create a Translator Object.
         self.translator = googletrans.Translator()
 
         vocabulary = []
+        try:
+            with open("./models/alphabet_94.txt") as f:
+                # Read the file line by line
+                for l in f:
+                    # Append each line into the vocabulary list.
+                    vocabulary.append(l.strip())
+        except FileNotFoundError:
+            print("File not found!")
+            # Handle error appropriately, maybe exit the program
+        except PermissionError:
+            print("No permission to read the file!")
+            # Handle error appropriately
 
-        # Open file to import the vocabulary.
-        with open("./models/alphabet_94.txt") as f:
-            # Read the file line by line
-            for l in f:
-                # Append each line into the vocabulary list.
-                vocabulary.append(l.strip())
-            f.close()
-        print("Vocabulary:", vocabulary, len(vocabulary))
+        try:
+            # DB model for text-detection based on resnet50
+            self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
+        except FileNotFoundError:
+            print("File not found!")
+            # Handle error appropriately, maybe exit the program
+        except PermissionError:
+            print("No permission to read the file!")
+            # Handle error appropriately
 
-        # DB model for text-detection based on resnet50
-        self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
+        try:
+            # CRNN model for text-recognition.
+            self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
+        except FileNotFoundError:
+            print("File not found!")
+            # Handle error appropriately, maybe exit the program
+        except PermissionError:
+            print("No permission to read the file!")
+            # Handle error appropriately
 
         # Set threshold for Binary Map creation and polygon detection
-        binThresh = 0.3
-        polyThresh = 0.5
+        self.binThresh = 0.3
+        self.polyThresh = 0.5
 
-        mean = (122.67891434, 116.66876762, 104.00698793)
-        inputSize = (640, 640)
+        self.mean = (122.67891434, 116.66876762, 104.00698793)
+        self.inputSize = (640, 640)
+        # self.inputSize = (320, 320)
 
-        self.textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
-        self.textDetector.setInputParams(1.0 / 255, inputSize, mean, True)
+        self.textDetector.setBinaryThreshold(self.binThresh).setPolygonThreshold(self.polyThresh)
+        self.textDetector.setInputParams(1.0 / 255, self.inputSize, self.mean, True)
 
-        # CRNN model for text-recognition.
-        self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
         self.textRecognizer.setDecodeType("CTC-greedy")
         self.textRecognizer.setVocabulary(vocabulary)
         self.textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
 
-        Clock.schedule_interval(self.process_image, 1.0 / 30.0)
-
-        self.frame_count = 0
+    def load_image(self, instance):
+        if len(self.filechooser.selection) > 0:
+            self.input_source = self.filechooser.selection[0]
+            self.image.source = self.input_source
 
     def draw_label_banner_ocr(self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                               font_thickness=1):
@@ -761,6 +805,10 @@ class OCRTranslationPopup(BasePopup):
         # Use the DB text detector initialized previously to detect the presence of text in the image.
         boxes, confs = self.textDetector.detect(image)
 
+        if boxes is not None:
+            # Draw the bounding boxes of text detected.
+            cv2.polylines(image, boxes, True, (255, 0, 255), 3)
+
         # Iterate throught the bounding boxes detected by the text detector model
         for box in boxes:
 
@@ -776,39 +824,54 @@ class OCRTranslationPopup(BasePopup):
                     translation = self.translator.translate(recognizedText, dest, src)
                 else:
                     translation = self.translator.translate(recognizedText, dest)
+
+                pad_x = 10
+                shift_y = 10
+                px = int(np.max(box[0:4, 0])) + pad_x
+                py = int(np.average(box[0:4, 1])) + shift_y
+
+                lower_left = (px, py)
+
+                self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
+                                           fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+
             else:
                 print("No text was recognized in the frame.")
 
-            pad_x = 10
-            shift_y = 10
-            px = int(np.max(box[0:4, 0])) + pad_x
-            py = int(np.average(box[0:4, 1])) + shift_y
-
-            lower_left = (px, py)
-
-            self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
-                              fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
-
-        # Draw the bounding boxes of text detected.
-        cv2.polylines(image, boxes, True, (255, 0, 255), 3)
-
         return image
-
     def process_image(self, instance):
         Clock.schedule_once(self.process_image_thread, 0)
 
     def process_image_thread(self, dt, *args):
 
+        global texture_result
+        texture_result = None  # Reset to None before processing starts
+
         frame = self.get_latest_frame()
         if frame is None:
             return
         else:
+
+            ip_image = cv2.imread(self.input_source)
+            ip_image = cv2.resize(ip_image, self.inputSize)
+
             # ocr_result = recognizeTranslateText(frame, src='de')
-            frame = self.recognizeTranslateText(frame)
+            op_image = self.recognizeTranslateText(ip_image, src='ru')
 
-            texture = self.convert_frame_to_texture(self, frame)
-            self.image.texture = texture
+            # texture = self.convert_frame_to_texture(frame)
+            # self.image.texture = texture
 
+            # After processing, convert the output image to a texture.
+            texture_result = self.convert_frame_to_texture(op_image)
+
+            # Schedule a function to be called every frame until texture_result is not None.
+            Clock.schedule_interval(self.update_image_texture, 0)
+
+    def update_image_texture(self, dt):
+        global texture_result
+        if texture_result is not None:
+            self.image.texture = texture_result
+            return False  # This stops the function from being called again.
 
 class UnderConstructionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -833,14 +896,10 @@ class STEMKitv1App(App):
             Window.size = (800, 600)
         else:
             Window.size = (620, 420)
-        # layout = BoxLayout()
-        # filechooser = NewFileChooser()
-        # layout.add_widget(filechooser)
         return MainLayout()
 
     def on_stop(self):
         self.root.on_stop()
 
 if __name__ == "__main__":
-    # Builder.load_file('./STEM-Kit.kv')
     STEMKitv1App().run()
