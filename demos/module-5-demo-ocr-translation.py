@@ -2,35 +2,31 @@
 #
 # OCR + Translation Demo
 #
-# This script will monitor the image frames from a connected video camera.
-# If text is detected in the image frame, OCR and language translation will
-# be peformed on the detetcted text and the results will be annotated on the
-# image frame. Execute the script from the command line prompt [$] as shown
-# below:
+# This script uses the Google Translate API to detect text in an image and
+# translate the text to English. The translated text will be annotated on a
+# copy of the input image. Execute the script from the command line prompt [$]
+# as shown below:
 #
 #    ~/demos $ python module-5-demo-ocr-translation.py
 #
-# A window should appear that shows the video feed from the camera. Point
-# the camera at some sample text in German to reveal the translated text.
+# A window will first appear that displays the input image (foreign-language.png).
+# Select any key on the keyboard to initiate the processing and a new window will
+# be displayed that shows the detected text and the associated translation to
+# English.
 #
 # Developed by Big Vision LLC for Emerging Technologies Institute (ETI).
 #------------------------------------------------------------------------------
 
 import cv2
 import numpy as np
-# import pyttsx3
 import googletrans
-# import matplotlib.pyplot as plt
 import argparse
-
-parser = argparse.ArgumentParser()
 
 ap= argparse.ArgumentParser()
 ap= argparse.ArgumentParser()
 ap.add_argument('--image', '-i', default='./foreign-language.png', help='Path to input image that contains foriegn text.')
 args= vars(ap.parse_args())
 args= vars(ap.parse_args())
-args = parser.parse_args()
 
 def draw_label_banner(frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1, font_thickness=1):
     '''
@@ -73,7 +69,7 @@ def recognizeTranslateText(image, dest='en', src=''):
     # Use the DB text detector initialized previously to detect the presence of text in the image.
     boxes, confs = textDetector.detect(image)
 
-    #Iterate throught the bounding boxes detected by the text detector model
+    # Process each detected text block.
     for box in boxes:
 
         # Apply transformation on the bounding box detected by the text detection algorithm.
@@ -142,21 +138,21 @@ if __name__ == "__main__":
     textRecognizer.setVocabulary(vocabulary)
     textRecognizer.setInputParams(1/127.5, (100,32), (127.5, 127.5, 127.5), True)
 
-    # read foriegb image
-    # source = args['image']
-    ip_image = cv2.imread('./foreign-language.png')
+    # Set the desired frame size.
+    frameWidth = 512
+    frameHeight = 512
+
+    source = args['image']
+    ip_image = cv2.imread(source)
 
     frame = ip_image.copy()
+    frame = cv2.resize(frame, (frameWidth, frameHeight))
 
     cv2.imshow("Input", frame)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    # Set the desired frame size.
-    frameWidth = 640
-    frameHeight = 640
-
-    frame = cv2.resize(frame, (frameWidth, frameHeight))
+    # frame = cv2.resize(frame, (frameWidth, frameHeight))
 
     # ocr_result = recognizeTranslateText(frame, src='de')
     ocr_result = recognizeTranslateText(frame)
