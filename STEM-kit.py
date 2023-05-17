@@ -753,7 +753,6 @@ class OCRTranslationPopup(BasePopup):
 
         self.mean = (122.67891434, 116.66876762, 104.00698793)
         self.inputSize = (640, 640)
-        # self.inputSize = (320, 320)
 
         self.textDetector.setBinaryThreshold(self.binThresh).setPolygonThreshold(self.polyThresh)
         self.textDetector.setInputParams(1.0 / 255, self.inputSize, self.mean, True)
@@ -802,7 +801,7 @@ class OCRTranslationPopup(BasePopup):
         result = cv2.warpPerspective(frame, rotationMatrix, outputSize)
         return result
 
-    # Perform Language Translation on Recognized Text.
+    # Perform OCR and Language Translation on Recognized Text.
     def recognizeTranslateText(self, image, dest='en', src=''):
 
         # Use the DB text detector initialized previously to detect the presence of text in the image.
@@ -832,9 +831,7 @@ class OCRTranslationPopup(BasePopup):
                 shift_y = 10
                 px = int(np.max(box[0:4, 0])) + pad_x
                 py = int(np.average(box[0:4, 1])) + shift_y
-
                 lower_left = (px, py)
-
                 self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
                                            fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
 
@@ -995,7 +992,7 @@ class BinaryDecoderPopup(BasePopup):
 
         # Variable declaration
         code = []
-        binary = 0
+        binary = None
 
         # Image resizing for screen fit
         image = cv2.resize(image, (640, 640))
@@ -1009,6 +1006,9 @@ class BinaryDecoderPopup(BasePopup):
 
         # Iterate through detected text regions
         for box in boxes:
+
+            # Variable declaration
+            code = []
 
             # Apply transformation on the detected bounding box
             croppedRoi = self.fourPointsTransform(image, box)
@@ -1025,6 +1025,9 @@ class BinaryDecoderPopup(BasePopup):
                 for item in recognizedText:
                     code.append(str(item))
                 binary = "".join(code)
+                print("code:   ", str(code))
+                print("binary: ", binary)
+                print("intbin: ", int(binary))
                 binary = int(binary)
                 recognizedDec = str(self.binaryToDecimal(binary))
 
@@ -1036,12 +1039,13 @@ class BinaryDecoderPopup(BasePopup):
                 lower_left = (px, py)
 
                 self.draw_label_banner_ocr(image, recognizedDec, lower_left, font_color=(255, 255, 255),
-                                           fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+                                           fill_color=(255, 0, 0), font_scale=1, font_thickness=2)
 
             else:
                 print("No text was recognized in the frame.")
 
-            return image
+        return image
+
     def process_image(self, dt, *args):
 
         frame = self.get_latest_frame()
@@ -1071,7 +1075,7 @@ class UnderConstructionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-class STEMKitv1App(App):
+class STEMKitv2App(App):
     def build(self):
         if (mode == 'LT'):
             Window.size = (800, 600)
@@ -1083,4 +1087,4 @@ class STEMKitv1App(App):
         self.root.on_stop()
 
 if __name__ == "__main__":
-    STEMKitv1App().run()
+    STEMKitv2App().run()
