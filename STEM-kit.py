@@ -15,6 +15,7 @@ import numpy as np
 import cv2
 #import pyzbar.pyzbar as pyzbar
 import onnxruntime
+import pytesseract
 import googletrans
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -138,7 +139,7 @@ class MainLayout(BoxLayout):
             "Face Recognition",
             "OCR + Translation",
             "QR Code Decoder",
-            "Module 6",
+            "Binary Decoder",
             "Module 7",
             "Module 8",
         ]
@@ -183,6 +184,8 @@ class MainLayout(BoxLayout):
             popup = EdgeDetectionPopup(self)
         elif module_name == "OCR + Translation":
             popup = OCRTranslationPopup(self)
+        elif module_name == "Binary Decoder":
+            popup = BinaryDecoderPopup(self)
         else:
             # Add additional modules here
             popup = UnderConstructionPopup(self)
@@ -869,6 +872,187 @@ class OCRTranslationPopup(BasePopup):
         if texture_result is not None:
             self.image.texture = texture_result
             return False  # This stops the function from being called again.
+
+class BinaryDecoderPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(BinaryDecoderPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Decode Binary Code"
+
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        # Create a Translator Object.
+        self.translator = googletrans.Translator()
+
+        vocabulary = []
+        try:
+            with open("./models/alphabet_01.txt") as f:
+                # Read the file line by line
+                for l in f:
+                    # Append each line into the vocabulary list.
+                    vocabulary.append(l.strip())
+        except FileNotFoundError:
+            print("File not found!")
+            # Handle error appropriately, maybe exit the program
+        except PermissionError:
+            print("No permission to read the file!")
+            # Handle error appropriately
+
+        try:
+            # DB model for text-detection based on resnet50
+            self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
+        except FileNotFoundError:
+            print("File not found!")
+            # Handle error appropriately, maybe exit the program
+        except PermissionError:
+            print("No permission to read the file!")
+            # Handle error appropriately
+
+        try:
+            # CRNN model for text-recognition.
+            self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
+        except FileNotFoundError:
+            print("File not found!")
+            # Handle error appropriately, maybe exit the program
+        except PermissionError:
+            print("No permission to read the file!")
+            # Handle error appropriately
+
+        # Set threshold for Binary Map creation and polygon detection
+        self.binThresh = 0.3
+        self.polyThresh = 0.5
+
+        self.mean = (122.67891434, 116.66876762, 104.00698793)
+        self.inputSize = (640, 640)
+        # self.inputSize = (320, 320)
+
+        self.textDetector.setBinaryThreshold(self.binThresh).setPolygonThreshold(self.polyThresh)
+        self.textDetector.setInputParams(1.0 / 255, self.inputSize, self.mean, True)
+
+        self.textRecognizer.setDecodeType("CTC-greedy")
+        self.textRecognizer.setVocabulary(vocabulary)
+        self.textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
+
+        Clock.schedule_interval(self.process_image, frame_rate)
+
+    def binaryToDecimal(self, binary):
+
+        decimal, i = 0, 0
+
+        while (binary != 0):
+            dec = binary % 10
+            decimal = decimal + dec * pow(2, i)
+            binary = binary // 10
+            i += 1
+        return decimal
+
+    def draw_label_banner_ocr(self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
+                              font_thickness=1):
+        '''
+        Annotate the image frame with a text banner overlayed on a filled rectangle.
+        '''
+        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
+        text_pad = 8
+
+        # Define upper left and lower right vertices of rectangle.
+        px1 = lower_left[0] - text_pad
+        px2 = lower_left[0] + int(text_size[0]) + text_pad
+        py1 = lower_left[1] - int(text_size[1]) - text_pad
+        py2 = lower_left[1] + text_pad
+
+        frame = cv2.rectangle(frame, (px1, py1), (px2, py2), fill_color, thickness=-1, lineType=cv2.LINE_8)
+
+        cv2.putText(frame, text, lower_left, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
+                    cv2.LINE_AA)
+
+
+    # Align text boxes.
+    # This Function does transformation over the bounding boxes detected by the text detection model
+    def fourPointsTransform(self, frame, vertices):
+        # Print vertices of each bounding box
+        vertices = np.asarray(vertices).astype(np.float32)
+        outputSize = (100, 32)
+        targetVertices = np.array([
+            [0, outputSize[1] - 1],
+            [0, 0],
+            [outputSize[0] - 1, 0],
+            [outputSize[0] - 1, outputSize[1] - 1]], dtype="float32")
+        # Apply perspective transform
+        rotationMatrix = cv2.getPerspectiveTransform(vertices, targetVertices)
+        result = cv2.warpPerspective(frame, rotationMatrix, outputSize)
+        return result
+
+    def recognizeText(self, image, dest='en', src='', debug=False):
+
+        # Variable declaration
+        code = []
+        binary = 0
+
+        # Image resizing for screen fit
+        image = cv2.resize(image, (640, 640))
+
+        # Check for presence of text on image
+        boxes, confs = self.textDetector.detect(image)
+
+        if boxes is not None:
+            # Draw the bounding boxes of text detected.
+            cv2.polylines(image, boxes, True, (255, 0, 255), 3)
+
+        # Iterate through detected text regions
+        for box in boxes:
+
+            # Apply transformation on the detected bounding box
+            croppedRoi = self.fourPointsTransform(image, box)
+
+            # Recognise the text using the crnn model
+            recognizedText = self.textRecognizer.recognize(croppedRoi)
+
+            if recognizedText is not None and recognizedText.strip() != '':
+
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                # pt_code = pytesseract.image_to_string(gray, config="--psm 4")
+
+                # Type conversion operations
+                for item in recognizedText:
+                    code.append(str(item))
+                binary = "".join(code)
+                binary = int(binary)
+                recognizedDec = str(self.binaryToDecimal(binary))
+
+                pad_x = 10
+                shift_y = 10
+                px = int(np.max(box[0:4, 0])) + pad_x
+                py = int(np.average(box[0:4, 1])) + shift_y
+
+                lower_left = (px, py)
+
+                self.draw_label_banner_ocr(image, recognizedDec, lower_left, font_color=(255, 255, 255),
+                                           fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+
+            else:
+                print("No text was recognized in the frame.")
+
+            return image
+    def process_image(self, dt, *args):
+
+        frame = self.get_latest_frame()
+        if frame is None:
+            return
+        else:
+            # Perform inference on input image
+            frame = self.recognizeText(frame, src='en')
+            if frame is not None:
+                texture = self.convert_frame_to_texture(frame)
+                self.image.texture = texture
 
 class UnderConstructionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
