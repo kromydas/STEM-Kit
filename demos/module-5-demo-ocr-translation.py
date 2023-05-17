@@ -62,7 +62,6 @@ def fourPointsTransform(frame, vertices):
     result = cv2.warpPerspective(frame, rotationMatrix, outputSize)
     return result
 
-
 # Perform Language Translation on Recognized Text.
 def recognizeTranslateText(image, dest='en', src=''):
 
@@ -159,10 +158,6 @@ if __name__ == "__main__":
 
     cv2.imshow('OCR Translation Result', ocr_result)
 
-    # cv2.imwrite("result.png", ocr_result)
-
-    # op_image = cv2.imread("result.png")
-    # cv2.imshow("Output", cv2.imread("result.png"))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
