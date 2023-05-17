@@ -107,19 +107,39 @@ if __name__ == "__main__":
     # Create a Translator Object.
     translator = googletrans.Translator()
 
-    vocabulary =[]
+    vocabulary = []
+    try:
+        with open("../models/alphabet_94.txt") as f:
+            # Read the file line by line
+            for l in f:
+                # Append each line into the vocabulary list.
+                vocabulary.append(l.strip())
+    except FileNotFoundError:
+        print("File not found!")
+        # Handle error appropriately, maybe exit the program
+    except PermissionError:
+        print("No permission to read the file!")
+        # Handle error appropriately
 
-   # Open file to import the vocabulary.
-    with open("../models/alphabet_94.txt") as f:
-        # Read the file line by line
-        for l in f:
-            # Append each line into the vocabulary list.
-            vocabulary.append(l.strip())
-        f.close()
-    print("Vocabulary:", vocabulary, len(vocabulary))
+    try:
+        # DB model for text-detection based on resnet50
+        textDetector = cv2.dnn_TextDetectionModel_DB("../models/DB_TD500_resnet50.onnx")
+    except FileNotFoundError:
+        print("File not found!")
+        # Handle error appropriately, maybe exit the program
+    except PermissionError:
+        print("No permission to read the file!")
+        # Handle error appropriately
 
-    # DB model for text-detection based on resnet50
-    textDetector = cv2.dnn_TextDetectionModel_DB("../models/DB_TD500_resnet50.onnx")
+    try:
+        # CRNN model for text-recognition.
+        textRecognizer = cv2.dnn_TextRecognitionModel("../models/crnn_cs.onnx")
+    except FileNotFoundError:
+        print("File not found!")
+        # Handle error appropriately, maybe exit the program
+    except PermissionError:
+        print("No permission to read the file!")
+        # Handle error appropriately
 
     # Set threshold for Binary Map creation and polygon detection
     binThresh = 0.3
