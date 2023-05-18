@@ -15,7 +15,7 @@ import numpy as np
 import cv2
 #import pyzbar.pyzbar as pyzbar
 import onnxruntime
-import pytesseract
+# import pytesseract
 import googletrans
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -954,9 +954,9 @@ class BinaryDecoderPopup(BasePopup):
 
     def draw_label_banner_ocr(self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                               font_thickness=1):
-        '''
+        """
         Annotate the image frame with a text banner overlayed on a filled rectangle.
-        '''
+        """
         text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
         text_pad = 8
 
@@ -1025,11 +1025,11 @@ class BinaryDecoderPopup(BasePopup):
                 for item in recognizedText:
                     code.append(str(item))
                 binary = "".join(code)
-                print("code:   ", str(code))
-                print("binary: ", binary)
-                print("intbin: ", int(binary))
                 binary = int(binary)
-                recognizedDec = str(self.binaryToDecimal(binary))
+                # print("code:   ", str(code))
+                # print("binary: ", binary)
+                # print("intbin: ", int(binary))
+                decoded_result = str(self.binaryToDecimal(binary))
 
                 pad_x = 10
                 shift_y = 10
@@ -1038,13 +1038,13 @@ class BinaryDecoderPopup(BasePopup):
 
                 lower_left = (px, py)
 
-                self.draw_label_banner_ocr(image, recognizedDec, lower_left, font_color=(255, 255, 255),
+                self.draw_label_banner_ocr(image, decoded_result, lower_left, font_color=(255, 255, 255),
                                            fill_color=(255, 0, 0), font_scale=1, font_thickness=2)
 
             else:
                 print("No text was recognized in the frame.")
 
-        return image
+        return decoded_result
 
     def process_image(self, dt, *args):
 
@@ -1052,7 +1052,7 @@ class BinaryDecoderPopup(BasePopup):
         if frame is None:
             return
         else:
-            # Perform inference on input image
+            # Perform inference on input image.
             frame = self.recognizeText(frame, src='en')
             if frame is not None:
                 texture = self.convert_frame_to_texture(frame)
