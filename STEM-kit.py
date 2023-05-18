@@ -40,11 +40,31 @@ import queue
 
 kivy.require("2.0.0")
 
-# Change this variable with the name of the trained models.
+# Load application models.
 angle_model_name = './models/deblurring_angle_model.hdf5'
 length_model_name = './models/deblurring_length_model.hdf5'
 model_angle = load_model(angle_model_name)
 model_length = load_model(length_model_name)
+
+try:
+    # DB model for text-detection based on resnet50
+    textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
+except FileNotFoundError:
+    print("File not found!")
+    # Handle error appropriately, maybe exit the program
+except PermissionError:
+    print("No permission to read the file!")
+    # Handle error appropriately
+
+try:
+    # CRNN model for text-recognition.
+    textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
+except FileNotFoundError:
+    print("File not found!")
+    # Handle error appropriately, maybe exit the program
+except PermissionError:
+    print("No permission to read the file!")
+    # Handle error appropriately
 
 frame_rate = 1./15.
 
@@ -69,6 +89,7 @@ if mode == 'SK':
     layout_padding_y = 25
     font_size_slider = 12
     default_media_path = '/media/pi'
+    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/'
 else:
     # Laptop run mode.
     Window.left = 450  # horizontal position
@@ -727,39 +748,39 @@ class OCRTranslationPopup(BasePopup):
             print("No permission to read the file!")
             # Handle error appropriately
 
-        try:
-            # DB model for text-detection based on resnet50
-            self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
-        except FileNotFoundError:
-            print("File not found!")
-            # Handle error appropriately, maybe exit the program
-        except PermissionError:
-            print("No permission to read the file!")
-            # Handle error appropriately
-
-        try:
-            # CRNN model for text-recognition.
-            self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
-        except FileNotFoundError:
-            print("File not found!")
-            # Handle error appropriately, maybe exit the program
-        except PermissionError:
-            print("No permission to read the file!")
-            # Handle error appropriately
+        # try:
+        #     # DB model for text-detection based on resnet50
+        #     self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
+        # except FileNotFoundError:
+        #     print("File not found!")
+        #     # Handle error appropriately, maybe exit the program
+        # except PermissionError:
+        #     print("No permission to read the file!")
+        #     # Handle error appropriately
+        #
+        # try:
+        #     # CRNN model for text-recognition.
+        #     self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
+        # except FileNotFoundError:
+        #     print("File not found!")
+        #     # Handle error appropriately, maybe exit the program
+        # except PermissionError:
+        #     print("No permission to read the file!")
+        #     # Handle error appropriately
 
         # Set threshold for Binary Map creation and polygon detection
-        self.binThresh = 0.3
-        self.polyThresh = 0.5
+        binThresh = 0.3
+        polyThresh = 0.5
 
-        self.mean = (122.67891434, 116.66876762, 104.00698793)
+        mean = (122.67891434, 116.66876762, 104.00698793)
         self.inputSize = (640, 640)
 
-        self.textDetector.setBinaryThreshold(self.binThresh).setPolygonThreshold(self.polyThresh)
-        self.textDetector.setInputParams(1.0 / 255, self.inputSize, self.mean, True)
+        textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
+        textDetector.setInputParams(1.0 / 255, self.inputSize, mean, True)
 
-        self.textRecognizer.setDecodeType("CTC-greedy")
-        self.textRecognizer.setVocabulary(vocabulary)
-        self.textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
+        textRecognizer.setDecodeType("CTC-greedy")
+        textRecognizer.setVocabulary(vocabulary)
+        textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
 
     def load_image(self, instance):
         if len(self.filechooser.selection) > 0:
@@ -805,7 +826,7 @@ class OCRTranslationPopup(BasePopup):
     def recognizeTranslateText(self, image, dest='en', src=''):
 
         # Use the DB text detector initialized previously to detect the presence of text in the image.
-        boxes, confs = self.textDetector.detect(image)
+        boxes, confs = textDetector.detect(image)
 
         if boxes is not None:
             # Draw the bounding boxes of text detected.
@@ -818,7 +839,7 @@ class OCRTranslationPopup(BasePopup):
             croppedRoi = self.fourPointsTransform(image, box)
 
             # Recognize the text using the crnn model.
-            recognizedText = self.textRecognizer.recognize(croppedRoi)
+            recognizedText = textRecognizer.recognize(croppedRoi)
 
             if recognizedText is not None and recognizedText.strip() != '':
                 # translation = translator.translate(recognizedText, dest, src)
@@ -904,40 +925,40 @@ class BinaryDecoderPopup(BasePopup):
             print("No permission to read the file!")
             # Handle error appropriately
 
-        try:
-            # DB model for text-detection based on resnet50
-            self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
-        except FileNotFoundError:
-            print("File not found!")
-            # Handle error appropriately, maybe exit the program
-        except PermissionError:
-            print("No permission to read the file!")
-            # Handle error appropriately
-
-        try:
-            # CRNN model for text-recognition.
-            self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
-        except FileNotFoundError:
-            print("File not found!")
-            # Handle error appropriately, maybe exit the program
-        except PermissionError:
-            print("No permission to read the file!")
-            # Handle error appropriately
+        # try:
+        #     # DB model for text-detection based on resnet50
+        #     self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
+        # except FileNotFoundError:
+        #     print("File not found!")
+        #     # Handle error appropriately, maybe exit the program
+        # except PermissionError:
+        #     print("No permission to read the file!")
+        #     # Handle error appropriately
+        #
+        # try:
+        #     # CRNN model for text-recognition.
+        #     self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
+        # except FileNotFoundError:
+        #     print("File not found!")
+        #     # Handle error appropriately, maybe exit the program
+        # except PermissionError:
+        #     print("No permission to read the file!")
+        #     # Handle error appropriately
 
         # Set threshold for Binary Map creation and polygon detection
-        self.binThresh = 0.3
-        self.polyThresh = 0.5
+        binThresh = 0.3
+        polyThresh = 0.5
 
-        self.mean = (122.67891434, 116.66876762, 104.00698793)
-        self.inputSize = (640, 640)
+        mean = (122.67891434, 116.66876762, 104.00698793)
+        inputSize = (640, 640)
         # self.inputSize = (320, 320)
 
-        self.textDetector.setBinaryThreshold(self.binThresh).setPolygonThreshold(self.polyThresh)
-        self.textDetector.setInputParams(1.0 / 255, self.inputSize, self.mean, True)
+        textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
+        textDetector.setInputParams(1.0 / 255, inputSize, mean, True)
 
-        self.textRecognizer.setDecodeType("CTC-greedy")
-        self.textRecognizer.setVocabulary(vocabulary)
-        self.textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
+        textRecognizer.setDecodeType("CTC-greedy")
+        textRecognizer.setVocabulary(vocabulary)
+        textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
 
         Clock.schedule_interval(self.process_image, frame_rate)
 
@@ -998,7 +1019,7 @@ class BinaryDecoderPopup(BasePopup):
         image = cv2.resize(image, (640, 640))
 
         # Check for presence of text on image
-        boxes, confs = self.textDetector.detect(image)
+        boxes, confs = textDetector.detect(image)
 
         if boxes is not None:
             # Draw the bounding boxes of text detected.
@@ -1014,11 +1035,11 @@ class BinaryDecoderPopup(BasePopup):
             croppedRoi = self.fourPointsTransform(image, box)
 
             # Recognise the text using the crnn model
-            recognizedText = self.textRecognizer.recognize(croppedRoi)
+            recognizedText = textRecognizer.recognize(croppedRoi)
 
             if recognizedText is not None and recognizedText.strip() != '':
 
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
                 # pt_code = pytesseract.image_to_string(gray, config="--psm 4")
 
                 # Type conversion operations
@@ -1044,7 +1065,7 @@ class BinaryDecoderPopup(BasePopup):
             else:
                 print("No text was recognized in the frame.")
 
-        return decoded_result
+        return image
 
     def process_image(self, dt, *args):
 
