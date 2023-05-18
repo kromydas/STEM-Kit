@@ -23,15 +23,15 @@ import googletrans
 import argparse
 
 ap= argparse.ArgumentParser()
-ap= argparse.ArgumentParser()
-ap.add_argument('--image', '-i', default='./foreign-language.png', help='Path to input image that contains foriegn text.')
-args= vars(ap.parse_args())
+ap.add_argument('--image', '-i', default='./foreign_text.png', help='Path to input image that contains foreign text.')
 args= vars(ap.parse_args())
 
-def draw_label_banner(frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1, font_thickness=1):
-    '''
+
+def draw_label_banner_ocr(frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
+                          font_thickness=1):
+    """
     Annotate the image frame with a text banner overlayed on a filled rectangle.
-    '''
+    """
     text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
     text_pad = 8
 
@@ -43,7 +43,8 @@ def draw_label_banner(frame, text, lower_left, font_color=(0, 0, 0), fill_color=
 
     frame = cv2.rectangle(frame, (px1, py1), (px2, py2), fill_color, thickness=-1, lineType=cv2.LINE_8)
 
-    cv2.putText(frame, text, lower_left, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness, cv2.LINE_AA)
+    cv2.putText(frame, text, lower_left, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
+                cv2.LINE_AA)
 
 # This function performs a transformation for each bounding box detected by the text detection model.
 def fourPointsTransform(frame, vertices):
@@ -93,7 +94,7 @@ def recognizeTranslateText(image, dest='en', src=''):
 
         lower_left = (px, py)
 
-        draw_label_banner(image, translation.text, lower_left, font_color=(255, 255, 255),
+        draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
                           fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
 
     # Draw the bounding boxes of text detected.
