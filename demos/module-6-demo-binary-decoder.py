@@ -10,6 +10,11 @@
 #------------------------------------------------------------------------------
 import cv2
 import numpy as np
+import argparse
+
+ap= argparse.ArgumentParser()
+ap.add_argument('--image', '-i', default='./binary_input.png', help='Path to input image that contains binary codes.')
+args= vars(ap.parse_args())
 
 def draw_label_banner_ocr(frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                           font_thickness=1):
@@ -67,12 +72,9 @@ def binaryToDecimal(binary):
 '''
 Function: Recognition of text from a given input image and perform conversion
 '''
-
-
 def recognizeText(image, dest='en', src='', debug=False):
     # Variable declaration
     code = []
-    binary = None
 
     # Image resizing for screen fit
     image = cv2.resize(image, (640, 640))
@@ -177,42 +179,27 @@ if __name__ == "__main__":
     textRecognizer.setVocabulary(vocabulary)
     textRecognizer.setInputParams(1/127.5, (100,32), (127.5, 127.5, 127.5),True)
 
-    # Initialize videocapture object.
-    deviceId = 0
-    cap = cv2.VideoCapture(deviceId)
-
     # Set the detector input size based on the video frame size.
     frameWidth = 600
     frameHeight = 480
 
-    # Initialize QR detector.
-    qcd = cv2.QRCodeDetector()
-
     move_window_flag = True
 
-    # Enter infinite loop to process an endless video stream from the connected camera.
-    while (True):
+    source = args['image']
+    ip_image = cv2.imread(source)
 
-        # Read one frame at a time from the video camera.
-        has_frame, frame = cap.read()
+    frame = ip_image.copy()
+    frame = cv2.resize(frame, (frameWidth, frameHeight))
 
-        if has_frame:
-
-            # Perform inference on input image
-            frame = recognizeText(frame, src='en')
-
-            # Display annotated frame in window.
-            cv2.imshow('Live', frame)
-
-            if move_window_flag:
-                cv2.moveWindow('Live', 170, 20)
-                move_window_flag = False
-
-            key = cv2.waitKey(1)
-            # Quit program when `q` or the `esc` key is selected.
-            if key == ord('Q') or key == ord('q') or key == 27:
-                break
-
-    # Release video object and destroy windows.
-    cap.release()
+    cv2.imshow("Input", frame)
+    cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    # Perform inference on input image
+    decoded_image = recognizeText(frame, src='en')
+
+    cv2.imshow('Binary Decoded Result', decoded_image)
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
