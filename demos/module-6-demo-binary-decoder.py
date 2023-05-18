@@ -10,27 +10,31 @@
 #------------------------------------------------------------------------------
 import cv2
 import numpy as np
-import pyttsx3
-import googletrans
-import matplotlib.pyplot as plt
-import argparse
 
-import cv2
-import pytesseract
+def draw_label_banner_ocr(frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
+                          font_thickness=1):
+    """
+    Annotate the image frame with a text banner overlayed on a filled rectangle.
+    """
+    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
+    text_pad = 8
 
+    # Define upper left and lower right vertices of rectangle.
+    px1 = lower_left[0] - text_pad
+    px2 = lower_left[0] + int(text_size[0]) + text_pad
+    py1 = lower_left[1] - int(text_size[1]) - text_pad
+    py2 = lower_left[1] + text_pad
 
+    frame = cv2.rectangle(frame, (px1, py1), (px2, py2), fill_color, thickness=-1, lineType=cv2.LINE_8)
 
-# Parser definition
-parser = argparse.ArgumentParser()
-parser.add_argument('--input')
-args = parser.parse_args()
+    cv2.putText(frame, text, lower_left, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
+                cv2.LINE_AA)
 
-'''
-Function: Align text boxes - transformation over the bounding boxes 
-            detected by the text detection model
-'''
 def fourPointsTransform(frame, vertices):
-
+    """
+    Function: Align text boxes - transformation over the bounding boxes
+                detected by the text detection model
+    """
     # Print vertices of each bounding box 
     vertices = np.asarray(vertices).astype(np.float32)
     outputSize = (100, 32)
@@ -63,60 +67,64 @@ def binaryToDecimal(binary):
 '''
 Function: Recognition of text from a given input image and perform conversion
 '''
-def recognizeText(image, dest='en', src='', debug=False):
 
+
+def recognizeText(image, dest='en', src='', debug=False):
     # Variable declaration
     code = []
-    binary = 0
-    
+    binary = None
+
     # Image resizing for screen fit
     image = cv2.resize(image, (640, 640))
 
     # Check for presence of text on image
     boxes, confs = textDetector.detect(image)
 
-    # Iterate through detected text regions
-    for box in boxes:
-
-        # Apply transformation on the detected bounding box
-        croppedRoi  = fourPointsTransform(image,box)
-        if debug:
-            plt.imshow(croppedRoi);plt.show()
-
-        # Recognise the text using the crnn model
-        recognizedText = textRecognizer.recognize(croppedRoi)
-        print("DL Detected code: ", recognizedText)
-
-        gry = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        pt_code = pytesseract.image_to_string(gry, config="--psm 4")
-
-        print("PT Detected code: ", pt_code)
-
-        # Type conversion operations
-        for item in recognizedText:
-            code.append(str(item))
-        binary = "".join(code)
-        binary = int(binary)
-        recognizedDec = str(binaryToDecimal(binary))
-
-        # Get scaled values
-        boxHeight = int((abs((box[0,1]-box[1,1]))))
-        
-        # Get scale of the font
-        fontScale = cv2.getFontScaleFromHeight( cv2.FONT_HERSHEY_SIMPLEX, boxHeight-5, 1 )
-
-        cv2.putText(image, "Detected code: " + recognizedText, (10, 500), cv2.FONT_HERSHEY_SIMPLEX, fontScale / 4,
-                    (0,0,0), 1, 5)
-        
-        # Write the recognised text on the output image
-        cv2.putText(image, "Detected code: " + recognizedDec, (10,550), cv2.FONT_HERSHEY_SIMPLEX, fontScale/2, (0,0,0), 1, 5)
-        
+    if boxes is not None:
         # Draw the bounding boxes of text detected.
         cv2.polylines(image, boxes, True, (255, 0, 255), 3)
 
-        cv2.imshow('Result', image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    # Iterate through detected text regions
+    for box in boxes:
+
+        # Variable declaration
+        code = []
+
+        # Apply transformation on the detected bounding box
+        croppedRoi = fourPointsTransform(image, box)
+
+        # Recognise the text using the crnn model
+        recognizedText = textRecognizer.recognize(croppedRoi)
+
+        if recognizedText is not None and recognizedText.strip() != '':
+
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            # pt_code = pytesseract.image_to_string(gray, config="--psm 4")
+
+            # Type conversion operations
+            for item in recognizedText:
+                code.append(str(item))
+            binary = "".join(code)
+            binary = int(binary)
+            # print("code:   ", str(code))
+            # print("binary: ", binary)
+            # print("intbin: ", int(binary))
+            recognizedDec = str(binaryToDecimal(binary))
+
+            pad_x = 10
+            shift_y = 10
+            px = int(np.max(box[0:4, 0])) + pad_x
+            py = int(np.average(box[0:4, 1])) + shift_y
+
+            lower_left = (px, py)
+
+            draw_label_banner_ocr(image, recognizedDec, lower_left, font_color=(255, 255, 255),
+                                       fill_color=(255, 0, 0), font_scale=1, font_thickness=2)
+
+        else:
+            print("No text was recognized in the frame.")
+
+    return image
         
 if __name__ == "__main__":
     
@@ -125,9 +133,6 @@ if __name__ == "__main__":
     binThresh = 0.3
     polyThresh = 0.5
     mean = (122.67891434, 116.66876762, 104.00698793)
-
-    # Load image from parser input
-    image = cv2.imread('../input_media/input.png')
 
     vocabulary = []
     try:
@@ -194,7 +199,7 @@ if __name__ == "__main__":
         if has_frame:
 
             # Perform inference on input image
-            recognizeText(frame, src='en')
+            frame = recognizeText(frame, src='en')
 
             # Display annotated frame in window.
             cv2.imshow('Live', frame)
