@@ -180,8 +180,8 @@ if __name__ == "__main__":
     textRecognizer.setInputParams(1/127.5, (100,32), (127.5, 127.5, 127.5),True)
 
     # Set the detector input size based on the video frame size.
-    frameWidth = 600
-    frameHeight = 480
+    frameWidth = 350
+    frameHeight = 250
 
     move_window_flag = True
 
@@ -197,6 +197,8 @@ if __name__ == "__main__":
 
     # Perform inference on input image
     decoded_image = recognizeText(frame, src='en')
+
+    decoded_image = cv2.resize(decoded_image, (frameWidth, frameHeight))
 
     cv2.imshow('Binary Decoded Result', decoded_image)
 
