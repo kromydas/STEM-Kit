@@ -551,7 +551,7 @@ class FaceRecognitionPopup(BasePopup):
         # frameWidth = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) * scale)
         # frameHeight = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * scale)
         frameWidth = 640
-        frameHeight = 480
+        frameHeight = 420
         detector.setInputSize([frameWidth, frameHeight])
 
         target_image = cv2.imread(cv2.samples.findFile(self.target_image))
@@ -814,14 +814,13 @@ class OCRTranslationPopup(BasePopup):
         # Use the DB text detector initialized previously to detect the presence of text in the image.
         boxes, confs = textDetector.detect(image)
 
-        # Image resizing for screen fit
         image = cv2.resize(image, self.inputSize)
 
         if boxes is not None:
             # Draw the bounding boxes of text detected.
             cv2.polylines(image, boxes, True, (255, 0, 255), 3)
 
-        # Iterate throught the bounding boxes detected by the text detector model
+        # Iterate through the bounding boxes detected by the text detector model
         for box in boxes:
 
             # Apply transformation on the bounding box detected by the text detection algorithm.
@@ -854,7 +853,7 @@ class OCRTranslationPopup(BasePopup):
     def process_image_thread(self, dt, *args):
 
         global texture_result
-        texture_result = None  # Reset to None before processing starts
+        texture_result = None  # Reset to None before processing starts.
 
         frame = self.get_latest_frame()
         if frame is None:
@@ -864,7 +863,6 @@ class OCRTranslationPopup(BasePopup):
             ip_image = cv2.imread(self.input_source)
             ip_image = cv2.resize(ip_image, self.inputSize)
 
-            # ocr_result = recognizeTranslateText(frame, src='de')
             op_image = self.recognizeTranslateText(ip_image, src='ru')
 
             # After processing, convert the output image to a texture.
@@ -977,13 +975,7 @@ class BinaryDecoderPopup(BasePopup):
 
     def recognizeText(self, image, dest='en', src='', debug=False):
 
-        # Variable declaration
-        code = []
-        binary = None
-
-        # Image resizing for screen fit
         image = cv2.resize(image, self.inputSize)
-        # image = cv2.resize(image, (640, 640))
 
         # Check for presence of text on image
         boxes, confs = textDetector.detect(image)
