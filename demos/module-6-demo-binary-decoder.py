@@ -2,9 +2,23 @@
 #
 # Binary Decoder Demo
 #
+# This script will detect text in the input image and attempt to convert it
+# to a decimal (base 10) representation. Any text in the input image is assumed
+# to contain either 0s or 1s as the purpose of this script is to decode binary
+# encoded numbers. Execute the script from the command line prompt [$]
+# as shown below:
 #
 #    ~/demos $ python module-6-demo-binary-decoder.py
 #
+# A window will first appear that displays the input image (binary_input.png)
+# that contains three binary encoded numbers. Select any key on the keyboard to
+# initiate the processing and a new window will be displayed that shows the
+# detected text and the associated decimal (base 10) representations.
+#
+# Alternatively, the script can be executed with an optional command line
+# argument to specify a different input file that contains binary numbers:
+#
+#    ~/demos $ python module-5-demo-ocr-translation.py --image filename.png
 #
 # Developed by Big Vision LLC for Emerging Technologies Institute (ETI).
 #------------------------------------------------------------------------------
@@ -19,7 +33,14 @@ args= vars(ap.parse_args())
 def draw_label_banner_ocr(frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                           font_thickness=1):
     """
-    Annotate the image frame with a text banner overlayed on a filled rectangle.
+    Annotate the image frame with a text banner overlaid on a filled rectangle.
+    :param frame: Input image frame.
+    :param text: Text string to annotate on frame.
+    :param lower_left: (x,y) coordinates for the lower-left corner of the text block.
+    :param font_color: Font color for the annotaed text string.
+    :param fill_color: Fill color for the background rectangle.
+    :param font_scale: Font scale for the annotated text.
+    :param font_thickness: Font thickness for the annotated text.
     """
     text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
     text_pad = 8
@@ -37,8 +58,10 @@ def draw_label_banner_ocr(frame, text, lower_left, font_color=(0, 0, 0), fill_co
 
 def fourPointsTransform(frame, vertices):
     """
-    Function: Align text boxes - transformation over the bounding boxes
-                detected by the text detection model
+    # This function performs a transformation for each bounding box detected by the text detection model.
+    :param frame: Input image frame with detected text.
+    :param vertices: Verticies of polygon for detected text block.
+    :return: Annotated image frame.
     """
     # Print vertices of each bounding box 
     vertices = np.asarray(vertices).astype(np.float32)
@@ -55,11 +78,12 @@ def fourPointsTransform(frame, vertices):
     
     return result
 
-'''
-Function: Conversion of Binary to Decimal variable
-'''
 def binaryToDecimal(binary):
-
+    """
+    Conversion of Binary to Decimal variable
+    :param binary: Binary (base 2) encoded number.
+    :return: Decimal (base 10) representation.
+    """
     decimal, i = 0, 0
     
     while(binary != 0):
@@ -69,15 +93,19 @@ def binaryToDecimal(binary):
         i += 1
     return decimal
 
-'''
-Function: Recognition of text from a given input image and perform conversion
-'''
 def recognizeText(image, dest='en', src='', debug=False):
+    """
+    # Perform Language Translation on Recognized Text.
+    :param image: Input image frame.
+    :param dest: Destination langauge (default is English).
+    :param src: Source langauge (default: unspecified)
+    :return: Annotated image frame with text bounding boxes and translated text.
+    """
+
     # Variable declaration
     code = []
 
-    # Image resizing for screen fit
-    image = cv2.resize(image, (640, 640))
+    image = cv2.resize(image, inputSize)
 
     # Check for presence of text on image
     boxes, confs = textDetector.detect(image)
@@ -92,18 +120,15 @@ def recognizeText(image, dest='en', src='', debug=False):
         # Variable declaration
         code = []
 
-        # Apply transformation on the detected bounding box
+        # Apply transformation on the detected bounding box.
         croppedRoi = fourPointsTransform(image, box)
 
-        # Recognise the text using the crnn model
+        # Recognize the text using the crnn model.
         recognizedText = textRecognizer.recognize(croppedRoi)
 
         if recognizedText is not None and recognizedText.strip() != '':
 
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            # pt_code = pytesseract.image_to_string(gray, config="--psm 4")
-
-            # Type conversion operations
+            # Conversion from Binary (base 2) to Decimal (base 10).
             for item in recognizedText:
                 code.append(str(item))
             binary = "".join(code)
@@ -129,9 +154,8 @@ def recognizeText(image, dest='en', src='', debug=False):
     return image
         
 if __name__ == "__main__":
-    
-    # Variable declaration
-    inputSize = (640, 640)
+
+    inputSize = (320, 320)
     binThresh = 0.3
     polyThresh = 0.5
     mean = (122.67891434, 116.66876762, 104.00698793)
@@ -139,67 +163,58 @@ if __name__ == "__main__":
     vocabulary = []
     try:
         with open("../models/alphabet_01.txt") as f:
-            # Read the file line by line
+            # Read the file line by line.
             for l in f:
                 # Append each line into the vocabulary list.
                 vocabulary.append(l.strip())
     except FileNotFoundError:
         print("File not found!")
-        # Handle error appropriately, maybe exit the program
+        exit()
     except PermissionError:
         print("No permission to read the file!")
-        # Handle error appropriately
+        exit()
 
     try:
-        # DB model for text-detection based on resnet50
+        # DB model for text-detection based on resnet50.
         textDetector = cv2.dnn_TextDetectionModel_DB("../models/DB_TD500_resnet50.onnx")
     except FileNotFoundError:
         print("File not found!")
-        # Handle error appropriately, maybe exit the program
+        exit()
     except PermissionError:
         print("No permission to read the file!")
-        # Handle error appropriately
+        exit()
 
     try:
         # CRNN model for text-recognition.
         textRecognizer = cv2.dnn_TextRecognitionModel("../models/crnn_cs.onnx")
     except FileNotFoundError:
         print("File not found!")
-        # Handle error appropriately, maybe exit the program
+        exit()
     except PermissionError:
         print("No permission to read the file!")
-        # Handle error appropriately
+        exit()
 
-    # DB model for text-detection based on resnet50
+    # DB model for text-detection based on resnet50.
     textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
     textDetector.setInputParams(1.0/255, inputSize, mean, True)
 
-    # CRNN model for text-recognition
+    # CRNN model for text-recognition.
     textRecognizer.setDecodeType("CTC-greedy")
     textRecognizer.setVocabulary(vocabulary)
     textRecognizer.setInputParams(1/127.5, (100,32), (127.5, 127.5, 127.5),True)
 
-    # Set the detector input size based on the video frame size.
-    frameWidth = 350
-    frameHeight = 250
-
-    move_window_flag = True
-
     source = args['image']
-    ip_image = cv2.imread(source)
+    frame = cv2.imread(source)
 
-    frame = ip_image.copy()
-    frame = cv2.resize(frame, (frameWidth, frameHeight))
+    # frame = ip_image.copy()
+    frame = cv2.resize(frame, inputSize)
 
     cv2.imshow("Input", frame)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    # Perform inference on input image
+    # Perform inference on the input image and display the annotated image.
     decoded_image = recognizeText(frame, src='en')
-
-    decoded_image = cv2.resize(decoded_image, (frameWidth, frameHeight))
-
     cv2.imshow('Binary Decoded Result', decoded_image)
 
     cv2.waitKey(0)

@@ -17,7 +17,7 @@
 # Alternatively, the script can be executed with an optional command line argument
 # specify a different input file:
 #
-#    ~/demos $ python module-5-demo-ocr-translation.py --image
+#    ~/demos $ python module-5-demo-ocr-translation.py --image filename.png
 #
 # Note: Since this script makes calls the Google Translate API, an internet
 # connection is required. If the script fails during processing this may
