@@ -10,12 +10,10 @@ import os
 os.environ["KIVY_NO_ARGS"] = "1"
 
 import sys
-import time
 import numpy as np
 import cv2
 #import pyzbar.pyzbar as pyzbar
 import onnxruntime
-# import pytesseract
 import googletrans
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -34,13 +32,13 @@ from kivy.uix.label import Label
 from kivy.graphics.texture import Texture
 from kivy.core.window import Window
 from kivy.uix.filechooser import FileChooserIconView, FileChooserListView
-from kivy.lang import Builder
 import threading
 import queue
 
 kivy.require("2.0.0")
-
+#--------------------------
 # Load application models.
+#--------------------------
 angle_model_name = './models/deblurring_angle_model.hdf5'
 length_model_name = './models/deblurring_length_model.hdf5'
 model_angle = load_model(angle_model_name)
@@ -51,25 +49,22 @@ try:
     textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
 except FileNotFoundError:
     print("File not found!")
-    # Handle error appropriately, maybe exit the program
+    exit()
 except PermissionError:
     print("No permission to read the file!")
-    # Handle error appropriately
+    exit()
 
 try:
     # CRNN model for text-recognition.
     textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
 except FileNotFoundError:
     print("File not found!")
-    # Handle error appropriately, maybe exit the program
+    exit()
 except PermissionError:
     print("No permission to read the file!")
-    # Handle error appropriately
+    exit()
 
 frame_rate = 1./15.
-
-class NewFileChooser(FileChooserListView):
-    pass
 
 def parse_command_line_args():
     mode = "SK"
@@ -89,7 +84,6 @@ if mode == 'SK':
     layout_padding_y = 25
     font_size_slider = 12
     default_media_path = '/media/pi'
-    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/'
 else:
     # Laptop run mode.
     Window.left = 450  # horizontal position
@@ -98,7 +92,7 @@ else:
     font_thickness = 2
     layout_padding_y = 40
     font_size_slider = 24
-    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props/'
+    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/demos/test-case/thumbdrive_files'
 
 def find_centroid_bbox(bbox):
     '''
@@ -453,14 +447,11 @@ class DeblurringPopup(BasePopup):
             ip_image = cv2.imread(self.input_source)
             ip_image = cv2.cvtColor(ip_image, cv2.COLOR_BGR2GRAY)
             ip_image = cv2.resize(ip_image, (640, 480))
-            # FFT visualization of the blurred image
-            # fft_img = self.create_fft(ip_image)
 
             # Predicting the psf parameters of length and angle.
             img = cv2.resize(self.create_fft(ip_image), (224, 224))
             img = np.expand_dims(img_to_array(img), axis=0) / 255.0
             preds = model_angle.predict(img)
-            # angle_value= np.sum(np.multiply(np.arange(0, 180), preds[0]))
             angle_value = np.mean(np.argsort(preds[0])[-3:])
 
             print("Predicted Blur Angle: ", angle_value)
@@ -614,11 +605,11 @@ class FaceRecognitionPopup(BasePopup):
                 target_face_align = recognizer.alignCrop(target_image, target_face[1][0])
                 target_face_feature = recognizer.feature(target_face_align)
 
-                cosine_similarity_threshold = 0.363
+                # cosine_similarity_threshold = 0.363
                 # l2_similarity_threshold = 1.128
                 l2_similarity_threshold = similarity_threshold
 
-                cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
+                #cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
                 l2_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
 
                 if l2_score <= l2_similarity_threshold:
@@ -634,7 +625,6 @@ class FaceRecognitionPopup(BasePopup):
 
                 texture = self.convert_frame_to_texture(frame)
                 self.image.texture = texture
-
 
 class EdgeDetectionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -748,32 +738,12 @@ class OCRTranslationPopup(BasePopup):
             print("No permission to read the file!")
             # Handle error appropriately
 
-        # try:
-        #     # DB model for text-detection based on resnet50
-        #     self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
-        # except FileNotFoundError:
-        #     print("File not found!")
-        #     # Handle error appropriately, maybe exit the program
-        # except PermissionError:
-        #     print("No permission to read the file!")
-        #     # Handle error appropriately
-        #
-        # try:
-        #     # CRNN model for text-recognition.
-        #     self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
-        # except FileNotFoundError:
-        #     print("File not found!")
-        #     # Handle error appropriately, maybe exit the program
-        # except PermissionError:
-        #     print("No permission to read the file!")
-        #     # Handle error appropriately
-
-        # Set threshold for Binary Map creation and polygon detection
+        # Set threshold for Binary Map creation and polygon detection.
         binThresh = 0.3
         polyThresh = 0.5
 
         mean = (122.67891434, 116.66876762, 104.00698793)
-        self.inputSize = (640, 640)
+        self.inputSize = (480, 480)
 
         textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
         textDetector.setInputParams(1.0 / 255, self.inputSize, mean, True)
@@ -789,9 +759,16 @@ class OCRTranslationPopup(BasePopup):
 
     def draw_label_banner_ocr(self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                               font_thickness=1):
-        '''
-        Annotate the image frame with a text banner overlayed on a filled rectangle.
-        '''
+        """
+        Annotate the image frame with a text banner overlaid on a filled rectangle.
+        :param frame: Input image frame.
+        :param text: Text string to annotate on frame.
+        :param lower_left: (x,y) coordinates for the lower-left corner of the text block.
+        :param font_color: Font color for the annotaed text string.
+        :param fill_color: Fill color for the background rectangle.
+        :param font_scale: Font scale for the annotated text.
+        :param font_thickness: Font thickness for the annotated text.
+        """
         text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
         text_pad = 8
 
@@ -806,10 +783,13 @@ class OCRTranslationPopup(BasePopup):
         cv2.putText(frame, text, lower_left, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
                     cv2.LINE_AA)
 
-    # Align text boxes.
-    # This Function does transformation over the bounding boxes detected by the text detection model
     def fourPointsTransform(self, frame, vertices):
-        # Print vertices of each bounding box
+        """
+        # This function performs a transformation for each bounding box detected by the text detection model.
+        :param frame: Input image frame with detected text.
+        :param vertices: Verticies of polygon for detected text block.
+        :return: Annotated image frame.
+        """
         vertices = np.asarray(vertices).astype(np.float32)
         outputSize = (100, 32)
         targetVertices = np.array([
@@ -822,11 +802,20 @@ class OCRTranslationPopup(BasePopup):
         result = cv2.warpPerspective(frame, rotationMatrix, outputSize)
         return result
 
-    # Perform OCR and Language Translation on Recognized Text.
-    def recognizeTranslateText(self, image, dest='en', src=''):
+    def recognizeTranslateText(self, image, dest='en', src=None):
+        """
+        # Perform Language Translation on Recognized Text.
+        :param image: Input image frame.
+        :param dest: Destination langauge (default is English).
+        :param src: Source langauge (default: unspecified)
+        :return: Annotated image frame with text bounding boxes and translated text.
+        """
 
         # Use the DB text detector initialized previously to detect the presence of text in the image.
         boxes, confs = textDetector.detect(image)
+
+        # Image resizing for screen fit
+        image = cv2.resize(image, self.inputSize)
 
         if boxes is not None:
             # Draw the bounding boxes of text detected.
@@ -842,20 +831,19 @@ class OCRTranslationPopup(BasePopup):
             recognizedText = textRecognizer.recognize(croppedRoi)
 
             if recognizedText is not None and recognizedText.strip() != '':
-                # translation = translator.translate(recognizedText, dest, src)
-                if src:
+                if src is not None:
                     translation = self.translator.translate(recognizedText, dest, src)
                 else:
                     translation = self.translator.translate(recognizedText, dest)
 
-                pad_x = 10
-                shift_y = 10
-                px = int(np.max(box[0:4, 0])) + pad_x
-                py = int(np.average(box[0:4, 1])) + shift_y
-                lower_left = (px, py)
-                self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
-                                           fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
-
+                if translation is not None:
+                    pad_x = 10
+                    shift_y = 10
+                    px = int(np.max(box[0:4, 0])) + pad_x
+                    py = int(np.average(box[0:4, 1])) + shift_y
+                    lower_left = (px, py)
+                    self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
+                                               fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
             else:
                 print("No text was recognized in the frame.")
 
@@ -925,36 +913,15 @@ class BinaryDecoderPopup(BasePopup):
             print("No permission to read the file!")
             # Handle error appropriately
 
-        # try:
-        #     # DB model for text-detection based on resnet50
-        #     self.textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
-        # except FileNotFoundError:
-        #     print("File not found!")
-        #     # Handle error appropriately, maybe exit the program
-        # except PermissionError:
-        #     print("No permission to read the file!")
-        #     # Handle error appropriately
-        #
-        # try:
-        #     # CRNN model for text-recognition.
-        #     self.textRecognizer = cv2.dnn_TextRecognitionModel("./models/crnn_cs.onnx")
-        # except FileNotFoundError:
-        #     print("File not found!")
-        #     # Handle error appropriately, maybe exit the program
-        # except PermissionError:
-        #     print("No permission to read the file!")
-        #     # Handle error appropriately
-
         # Set threshold for Binary Map creation and polygon detection
         binThresh = 0.3
         polyThresh = 0.5
 
         mean = (122.67891434, 116.66876762, 104.00698793)
-        inputSize = (640, 640)
-        # self.inputSize = (320, 320)
+        self.inputSize = (480, 480)
 
         textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
-        textDetector.setInputParams(1.0 / 255, inputSize, mean, True)
+        textDetector.setInputParams(1.0 / 255, self.inputSize, mean, True)
 
         textRecognizer.setDecodeType("CTC-greedy")
         textRecognizer.setVocabulary(vocabulary)
@@ -973,7 +940,7 @@ class BinaryDecoderPopup(BasePopup):
             i += 1
         return decimal
 
-    def draw_label_banner_ocr(self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
+    def draw_label_banner_ocr (self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                               font_thickness=1):
         """
         Annotate the image frame with a text banner overlayed on a filled rectangle.
@@ -991,7 +958,6 @@ class BinaryDecoderPopup(BasePopup):
 
         cv2.putText(frame, text, lower_left, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
                     cv2.LINE_AA)
-
 
     # Align text boxes.
     # This Function does transformation over the bounding boxes detected by the text detection model
@@ -1016,7 +982,8 @@ class BinaryDecoderPopup(BasePopup):
         binary = None
 
         # Image resizing for screen fit
-        image = cv2.resize(image, (640, 640))
+        image = cv2.resize(image, self.inputSize)
+        # image = cv2.resize(image, (640, 640))
 
         # Check for presence of text on image
         boxes, confs = textDetector.detect(image)
