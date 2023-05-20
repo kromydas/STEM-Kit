@@ -21,9 +21,16 @@ def find_centroid_bbox(bbox):
     return mid_x, mid_y
 
 def draw_label_banner(frame, text, centroid, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1, font_thickness=1):
-    '''
-    Annotate the image frame with a text banner overlayed on a filled rectangle.
-    '''
+    """
+    Annotate the image frame with a text banner overlaid on a filled rectangle.
+    :param frame: Input image frame.
+    :param text: Text string to annotate on frame.
+    :param centroid:  (x,y) coordinates for the center of the text block.
+    :param font_color: Font color for the annotaed text string.
+    :param fill_color: Fill color for the background rectangle.
+    :param font_scale: Font scale for the annotated text.
+    :param font_thickness: Font thickness for the annotated text.
+    """
     text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness + 2)[0]
     text_pad = 8
     # Define upper left and lower right vertices of rectangle.
@@ -80,7 +87,6 @@ def create_fft(img):
 
     return mag_spec
 
-# Change this variable with the name of the trained models.
 angle_model_name='../models/deblurring_angle_model.hdf5'
 length_model_name= '../models/deblurring_length_model.hdf5'
 
@@ -118,7 +124,6 @@ ip_image= cv2.resize(ip_image, (640, 480))
 img= cv2.resize(create_fft(ip_image), (224,224))
 img= np.expand_dims(img_to_array(img), axis=0)/ 255.0
 preds= model1.predict(img)
-# angle_value= np.sum(np.multiply(np.arange(0, 180), preds[0]))
 angle_value = np.mean(np.argsort(preds[0])[-3:])
 
 print("Predicted Blur Angle: ", angle_value)
@@ -129,9 +134,9 @@ op_image = process(ip_image, length_value, angle_value)
 op_image = (op_image*255).astype(np.uint8)
 op_image = (255/(np.max(op_image)-np.min(op_image))) * (op_image-np.min(op_image))
 
+# Passing op_image directly to imshow() does not work. Temporary work-around is to
+# write the imge to disk and read it back in for display.
 cv2.imwrite("result.png", op_image)
-
-# op_image = cv2.imread("result.png")
 cv2.imshow("Output", cv2.imread("result.png"))
 cv2.waitKey(0)
 cv2.destroyAllWindows()
