@@ -84,6 +84,7 @@ if mode == 'SK':
     layout_padding_y = 25
     font_size_slider = 12
     default_media_path = '/media/pi'
+    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/demos/test-case/thumbdrive_files'
 else:
     # Laptop run mode.
     Window.left = 450  # horizontal position
@@ -93,6 +94,13 @@ else:
     layout_padding_y = 40
     font_size_slider = 24
     default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/demos/test-case/thumbdrive_files'
+
+def check_camera():
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        return False
+    cap.release()
+    return True
 
 def find_centroid_bbox(bbox):
     '''
@@ -164,11 +172,37 @@ class MainLayout(BoxLayout):
             btn.bind(on_press=self.open_module_popup)
             self.modules_layout.add_widget(btn)
 
+        if not check_camera():
+            Clock.schedule_once(lambda dt: self.show_error_popup('Camera not connected!'), 0)
+            cv2.waitKey(0)
+            return
+
         self.capture = cv2.VideoCapture(0)
         self.frame_queue = queue.Queue(maxsize=1)
         self.capture_thread = threading.Thread(target=self.capture_frames)
         self.capture_thread.daemon = True
         self.capture_thread.start()
+
+    def show_error_popup(self, dt):  # dt argument is required for functions called by Clock.
+        content = BoxLayout(orientation='vertical')  # A layout for the Label and Button.
+        message = Label(text='No camera connected! Please connect a camera and restart the application.',
+                        color=(1, 0, 0, 1) ) # Red font color.
+        close_button = Button(text='Close', size_hint=(1, 0.3))  # Close button at 20% of the popup height.
+
+        content.add_widget(message)
+        content.add_widget(close_button)
+
+        popup = Popup(title='Error', content=content, size_hint=(None, None), size=(400, 200))
+        message.text_size = (
+        popup.size[0]*.8, None)  # Set the Label's text_size to the 80% of the width of the popup, and unlimited height.
+        message.valign = 'middle'  # Optional: align the text vertically in the middle.
+        close_button.bind(on_release=self.close_app)  # Close the app when the button is pressed.
+
+        popup.open()
+
+    def close_app(self, instance):  # We don't use 'instance', but it's passed by Kivy so we must include it
+        App.get_running_app().stop()  # Stop the currently running Kivy app
+
 
     def capture_frames(self):
 
@@ -413,21 +447,23 @@ class DeblurringPopup(BasePopup):
         Ang = np.float32([[-costerm, sinterm, 0], [sinterm, costerm, 0]])
         size2 = size // 2
         Ang[:, 2] = (size2, size2) - np.dot(Ang[:, :2], ((length - 1) * 0.5, 0))
-        psf = cv2.warpAffine(psf, Ang, (size, size), flags=cv2.INTER_CUBIC)  # Warp affine to get the desired psf
-
-        gray = ip_image
-        gray = np.float32(gray) / 255.0
-        gray_dft = cv2.dft(gray, flags=cv2.DFT_COMPLEX_OUTPUT)  # DFT of the image
-        psf /= psf.sum()  # Dividing by the sum
-        psf_mat = np.zeros_like(gray)
-        psf_mat[:size, :size] = psf
-        psf_dft = cv2.dft(psf_mat, flags=cv2.DFT_COMPLEX_OUTPUT)  # DFT of the psf
-        PSFsq = (psf_dft ** 2).sum(-1)
-        imgPSF = psf_dft / (PSFsq + noise)[..., np.newaxis]  # H in the equation for wiener deconvolution
-        gray_op = cv2.mulSpectrums(gray_dft, imgPSF, 0)
-        gray_res = cv2.idft(gray_op, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)  # Inverse DFT
-        gray_res = np.roll(gray_res, -size // 2, 0)
-        gray_res = np.roll(gray_res, -size // 2, 1)
+        if length > 0:
+            psf = cv2.warpAffine(psf, Ang, (size, size), flags=cv2.INTER_CUBIC)  # Warp affine to get the desired psf
+            gray = ip_image
+            gray = np.float32(gray) / 255.0
+            gray_dft = cv2.dft(gray, flags=cv2.DFT_COMPLEX_OUTPUT)  # DFT of the image
+            psf /= psf.sum()  # Dividing by the sum
+            psf_mat = np.zeros_like(gray)
+            psf_mat[:size, :size] = psf
+            psf_dft = cv2.dft(psf_mat, flags=cv2.DFT_COMPLEX_OUTPUT)  # DFT of the psf
+            PSFsq = (psf_dft ** 2).sum(-1)
+            imgPSF = psf_dft / (PSFsq + noise)[..., np.newaxis]  # H in the equation for wiener deconvolution
+            gray_op = cv2.mulSpectrums(gray_dft, imgPSF, 0)
+            gray_res = cv2.idft(gray_op, flags=cv2.DFT_SCALE | cv2.DFT_REAL_OUTPUT)  # Inverse DFT
+            gray_res = np.roll(gray_res, -size // 2, 0)
+            gray_res = np.roll(gray_res, -size // 2, 1)
+        else:
+            gray_res = ip_image
 
         return gray_res
 
