@@ -931,9 +931,6 @@ class BinaryDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        # Create a Translator Object.
-        #self.translator = googletrans.Translator()
-
         vocabulary = []
         try:
             with open("./models/alphabet_01.txt") as f:
