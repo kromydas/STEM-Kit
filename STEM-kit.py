@@ -36,6 +36,9 @@ import threading
 import queue
 
 kivy.require("2.0.0")
+
+frame_rate = 1./10.  # Process image update interval
+
 #--------------------------
 # Load application models.
 #--------------------------
@@ -43,6 +46,8 @@ angle_model_name = './models/deblurring_angle_model.hdf5'
 length_model_name = './models/deblurring_length_model.hdf5'
 model_angle = load_model(angle_model_name)
 model_length = load_model(length_model_name)
+
+translator = googletrans.Translator()
 
 try:
     # DB model for text-detection based on resnet50
@@ -63,8 +68,6 @@ except FileNotFoundError:
 except PermissionError:
     print("No permission to read the file!")
     exit()
-
-frame_rate = 1./15.
 
 def parse_command_line_args():
     mode = "SK"
@@ -879,8 +882,6 @@ class OCRTranslationPopup(BasePopup):
                     lower_left = (px, py)
                     self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
                                                fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
-            else:
-                print("No text was recognized in the frame.")
 
         return image
     def process_image(self, instance):
@@ -931,7 +932,7 @@ class BinaryDecoderPopup(BasePopup):
         button_layout.add_widget(self.close_button)
 
         # Create a Translator Object.
-        self.translator = googletrans.Translator()
+        #self.translator = googletrans.Translator()
 
         vocabulary = []
         try:
@@ -1013,31 +1014,27 @@ class BinaryDecoderPopup(BasePopup):
 
         image = cv2.resize(image, self.inputSize)
 
-        # Check for presence of text on image
+        # Check for presence of text on image.
         boxes, confs = textDetector.detect(image)
 
         if boxes is not None:
             # Draw the bounding boxes of text detected.
             cv2.polylines(image, boxes, True, (255, 0, 255), 3)
 
-        # Iterate through detected text regions
+        # Iterate through detected text regions.
         for box in boxes:
 
-            # Variable declaration
             code = []
 
             # Apply transformation on the detected bounding box
             croppedRoi = self.fourPointsTransform(image, box)
 
-            # Recognise the text using the crnn model
+            # Recognize the text using the crnn model
             recognizedText = textRecognizer.recognize(croppedRoi)
 
             if recognizedText is not None and recognizedText.strip() != '':
 
-                # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                # pt_code = pytesseract.image_to_string(gray, config="--psm 4")
-
-                # Type conversion operations
+                # Type conversion operations.
                 for item in recognizedText:
                     code.append(str(item))
                 binary = "".join(code)
@@ -1056,9 +1053,6 @@ class BinaryDecoderPopup(BasePopup):
 
                 self.draw_label_banner_ocr(image, decoded_result, lower_left, font_color=(255, 255, 255),
                                            fill_color=(255, 0, 0), font_scale=1, font_thickness=2)
-
-            else:
-                print("No text was recognized in the frame.")
 
         return image
 

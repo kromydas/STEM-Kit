@@ -114,10 +114,9 @@ def recognizeText(image, dest='en', src='', debug=False):
         # Draw the bounding boxes of text detected.
         cv2.polylines(image, boxes, True, (255, 0, 255), 3)
 
-    # Iterate through detected text regions
+    # Iterate through detected text regions.
     for box in boxes:
 
-        # Variable declaration
         code = []
 
         # Apply transformation on the detected bounding box.
