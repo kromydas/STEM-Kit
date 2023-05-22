@@ -88,7 +88,6 @@ if mode == 'SK':
     layout_padding_y = 25
     font_size_slider = 12
     default_media_path = '/media/pi'
-    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/demos/test-case/thumbdrive_files'
 else:
     # Laptop run mode.
     Window.left = 450  # horizontal position
