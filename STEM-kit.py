@@ -8,7 +8,6 @@
 # ------------------------------------------------------------------------------
 import os
 os.environ["KIVY_NO_ARGS"] = "1"
-
 import sys
 import numpy as np
 import cv2
@@ -51,7 +50,7 @@ model_length = load_model(length_model_name)
 translator = googletrans.Translator()
 
 try:
-    # DB model for text-detection based on resnet50
+    # DB model for text-detection based on resnet50.
     textDetector = cv2.dnn_TextDetectionModel_DB("./models/DB_TD500_resnet50.onnx")
 except FileNotFoundError:
     print("File not found!")
@@ -88,6 +87,7 @@ if mode == 'SK':
     layout_padding_y = 25
     font_size_slider = 12
     default_media_path = '/media/pi'
+    # default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props'
 else:
     # Laptop run mode.
     Window.left = 450  # horizontal position
@@ -96,7 +96,7 @@ else:
     font_thickness = 2
     layout_padding_y = 40
     font_size_slider = 24
-    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/demos/test-case/thumbdrive_files'
+    default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props'
 
 def check_camera():
     cap = cv2.VideoCapture(0)
@@ -841,7 +841,7 @@ class OCRTranslationPopup(BasePopup):
         result = cv2.warpPerspective(frame, rotationMatrix, outputSize)
         return result
 
-    def recognizeTranslateText(self, image, dest='en', src=None):
+    def recognizeTranslateText(self, image, gt_data=None, dest='en', src=None):
         """
         # Perform Language Translation on Recognized Text.
         :param image: Input image frame.
@@ -859,6 +859,7 @@ class OCRTranslationPopup(BasePopup):
             # Draw the bounding boxes of text detected.
             cv2.polylines(image, boxes, True, (255, 0, 255), 3)
 
+        idx = 0
         # Iterate through the bounding boxes detected by the text detector model
         for box in boxes:
 
@@ -869,10 +870,13 @@ class OCRTranslationPopup(BasePopup):
             recognizedText = textRecognizer.recognize(croppedRoi)
 
             if recognizedText is not None and recognizedText.strip() != '':
-                if src is not None:
-                    translation = self.translator.translate(recognizedText, dest, src)
+                if gt_data is not None:
+                    translation = gt_data[idx]
                 else:
-                    translation = self.translator.translate(recognizedText, dest)
+                    if src is not None:
+                        translation = self.translator.translate(recognizedText, dest, src)
+                    else:
+                        translation = self.translator.translate(recognizedText, dest)
 
                 if translation is not None:
                     pad_x = 10
@@ -880,9 +884,13 @@ class OCRTranslationPopup(BasePopup):
                     px = int(np.max(box[0:4, 0])) + pad_x
                     py = int(np.average(box[0:4, 1])) + shift_y
                     lower_left = (px, py)
-                    self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
+                    # self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
+                    #                            fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+
+                    self.draw_label_banner_ocr(image, translation, lower_left, font_color=(255, 255, 255),
                                                fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
 
+            idx+=1
         return image
     def process_image(self, instance):
         Clock.schedule_once(self.process_image_thread, 0)
@@ -891,6 +899,25 @@ class OCRTranslationPopup(BasePopup):
 
         global texture_result
         texture_result = None  # Reset to None before processing starts.
+        gt_data = None
+
+        #----------------------------------------------------------------------
+        # Special operating mode that by-passes the Google Translation API
+        # intentionally since that (free) service is not 100% reliable for
+        # returning valid data due to usage limitations.
+        # ----------------------------------------------------------------------
+        use_ground_truth = True
+        if use_ground_truth:
+            # Assign translation values based on the input image names.
+            if os.path.basename(self.input_source) == 'satellite_0.png':
+                gt_data = ['400.ha', '60.ha', 'Kalabravka']
+            elif os.path.basename(self.input_source) == 'satellite_1.png':
+                gt_data = ['Weapons', 'Hanger', 'Fuel', 'Missiles']
+            elif os.path.basename(self.input_source) == 'satellite_2.png':
+                gt_data = ['Eight', 'Six', 'Four']
+            else:
+                gt_data = ['Failed translation look-up.']
+
 
         frame = self.get_latest_frame()
         if frame is None:
@@ -900,7 +927,7 @@ class OCRTranslationPopup(BasePopup):
             ip_image = cv2.imread(self.input_source)
             ip_image = cv2.resize(ip_image, self.inputSize)
 
-            op_image = self.recognizeTranslateText(ip_image, src='ru')
+            op_image = self.recognizeTranslateText(ip_image, gt_data=gt_data, src='ru')
 
             # After processing, convert the output image to a texture.
             texture_result = self.convert_frame_to_texture(op_image)
