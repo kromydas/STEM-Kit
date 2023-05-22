@@ -1082,7 +1082,7 @@ class UnderConstructionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-class STEMKitv2App(App):
+class STEMKitv3App(App):
     def build(self):
         if (mode == 'LT'):
             Window.size = (800, 600)
@@ -1094,4 +1094,4 @@ class STEMKitv2App(App):
         self.root.on_stop()
 
 if __name__ == "__main__":
-    STEMKitv2App().run()
+    STEMKitv3App().run()
