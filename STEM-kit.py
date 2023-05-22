@@ -37,7 +37,8 @@ import queue
 
 kivy.require("2.0.0")
 
-frame_rate = 1./10.  # Process image update interval
+process_interval_sec = 0.1
+process_interval_ocr_sec = 0.2
 
 #--------------------------
 # Load application models.
@@ -324,8 +325,8 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        # Clock.schedule_interval(self.process_image, frame_rate)
-        Clock.schedule_interval(self.process_image_cv2, frame_rate)
+        # Clock.schedule_interval(self.process_image, process_interval_sec)
+        Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
 
         self.frame_count = 0
 
@@ -554,7 +555,7 @@ class FaceRecognitionPopup(BasePopup):
         self.close_button = Button(text="Close", size_hint_y=0.1)
         self.close_button.bind(on_press=self.close_popup)
         self.content.add_widget(self.close_button)
-        Clock.schedule_interval(self.process_image, frame_rate)
+        Clock.schedule_interval(self.process_image, process_interval_sec)
 
     def visualize(self, input, faces, thickness=2):
         if faces[1] is not None:
@@ -701,7 +702,7 @@ class EdgeDetectionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        Clock.schedule_interval(self.process_image, frame_rate)
+        Clock.schedule_interval(self.process_image, process_interval_sec)
 
         self.frame_count = 0
 
@@ -959,7 +960,7 @@ class BinaryDecoderPopup(BasePopup):
         textRecognizer.setVocabulary(vocabulary)
         textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
 
-        Clock.schedule_interval(self.process_image, frame_rate)
+        Clock.schedule_interval(self.process_image, process_interval_ocr_sec)
 
     def binaryToDecimal(self, binary):
 
