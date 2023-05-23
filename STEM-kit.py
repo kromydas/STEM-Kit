@@ -922,15 +922,24 @@ class OCRTranslationPopup(BasePopup):
         # ----------------------------------------------------------------------
         use_ground_truth = True
         if use_ground_truth:
-            # Assign translation values based on the input image names.
+            # Assign translation values based on the input image names for Event and Demo.
             if os.path.basename(self.input_source) == 'satellite_0.png':
+                # Event.
                 gt_data = ['400.ha', '60.ha', 'Kalabrovka']
             elif os.path.basename(self.input_source) == 'satellite_1.png':
+                # Event.
                 gt_data = ['Weapons', 'Hanger', 'Fuel', 'Missiles']
             elif os.path.basename(self.input_source) == 'satellite_2.png':
+                # Event.
                 gt_data = ['Eight', 'Six', 'Four']
+            elif os.path.basename(self.input_source) == 'foreign_text.png':
+                # Demo.
+                gt_data = ['Good morning', 'Good morning', 'Good morning', 'Good morning', 'Good morning']
             else:
-                gt_data = ['Failed translation look-up.']
+                # Handles up to six detected text blocks if some other image is loaded by mistake.
+                gt_data = ['Invalid translation', 'Invalid translation',
+                           'Invalid translation', 'Invalid translation',
+                           'Invalid translation', 'Invalid translation']
 
         frame = self.get_latest_frame()
         if frame is None:
