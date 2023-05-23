@@ -11,7 +11,7 @@ os.environ["KIVY_NO_ARGS"] = "1"
 import sys
 import numpy as np
 import cv2
-#import pyzbar.pyzbar as pyzbar
+import pyzbar.pyzbar as pyzbar
 import onnxruntime
 import googletrans
 from tensorflow.keras.models import load_model
@@ -170,7 +170,9 @@ class MainLayout(BoxLayout):
             "QR Code Decoder",
             "Binary Decoder",
             "Module 7",
-            "Object Detection",
+            "Module 8"
+            # "Artistic Filters",
+            # "Object Detection",
         ]
 
         for i in range(len(button_names)):
@@ -241,8 +243,12 @@ class MainLayout(BoxLayout):
             popup = OCRTranslationPopup(self)
         elif module_name == "Binary Decoder":
             popup = BinaryDecoderPopup(self)
+        elif module_name == "Artistic Filters":
+            #popup = ArtisticFiltersPopup(self)
+            popup = UnderConstructionPopup(self)
         elif module_name == "Object Detection":
-            popup = ObjectDetectionPopup(self)
+            #popup = ObjectDetectionPopup(self)
+            popup = UnderConstructionPopup(self)
         else:
             # Add additional modules here
             popup = UnderConstructionPopup(self)
@@ -334,32 +340,32 @@ class QRCodeDecoderPopup(BasePopup):
 
         self.frame_count = 0
 
-    def process_image_cv2(self, dt, *args):
-
-        frame = self.get_latest_frame()
-        if frame is None:
-            return
-
-        else:
-            qcd = cv2.QRCodeDetector()
-
-            # Convert the current frame to grayscale and decode any found QR codes.
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
-
-            if found_qr_code is True:
-
-                # Outline each detected QR code.
-                frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
-
-                # Annotate the frame with the decoded message.
-                for msg, points in zip(decoded_info, points):
-                    centroid = find_centroid_vertices(points)
-                    draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
-                                      font_scale=font_scale, font_thickness=font_thickness)
-
-            texture = self.convert_frame_to_texture(frame)
-            self.image.texture = texture
+    # def process_image_cv2(self, dt, *args):
+    #
+    #     frame = self.get_latest_frame()
+    #     if frame is None:
+    #         return
+    #
+    #     else:
+    #         qcd = cv2.QRCodeDetector()
+    #
+    #         # Convert the current frame to grayscale and decode any found QR codes.
+    #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    #         found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
+    #
+    #         if found_qr_code is True:
+    #
+    #             # Outline each detected QR code.
+    #             frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
+    #
+    #             # Annotate the frame with the decoded message.
+    #             for msg, points in zip(decoded_info, points):
+    #                 centroid = find_centroid_vertices(points)
+    #                 draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+    #                                   font_scale=font_scale, font_thickness=font_thickness)
+    #
+    #         texture = self.convert_frame_to_texture(frame)
+    #         self.image.texture = texture
 
     def process_image(self, dt, *args):
 
@@ -864,7 +870,7 @@ class OCRTranslationPopup(BasePopup):
             cv2.polylines(image, boxes, True, (255, 0, 255), 3)
 
         idx = 0
-        # Iterate through the bounding boxes detected by the text detector model
+        # Process each detected text block.
         for box in boxes:
 
             # Apply transformation on the bounding box detected by the text detection algorithm.
@@ -888,11 +894,15 @@ class OCRTranslationPopup(BasePopup):
                     px = int(np.max(box[0:4, 0])) + pad_x
                     py = int(np.average(box[0:4, 1])) + shift_y
                     lower_left = (px, py)
-                    # self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
-                    #                            fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+                    if gt_data is not None:
+                        # Use hard-coded values.
+                        self.draw_label_banner_ocr(image, translation, lower_left, font_color=(255, 255, 255),
+                                                   fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
 
-                    self.draw_label_banner_ocr(image, translation, lower_left, font_color=(255, 255, 255),
-                                               fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+                    else:
+                        # Use translation from Google API.
+                        self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
+                                                   fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
 
             idx+=1
         return image
@@ -914,7 +924,7 @@ class OCRTranslationPopup(BasePopup):
         if use_ground_truth:
             # Assign translation values based on the input image names.
             if os.path.basename(self.input_source) == 'satellite_0.png':
-                gt_data = ['400.ha', '60.ha', 'Kalabravka']
+                gt_data = ['400.ha', '60.ha', 'Kalabrovka']
             elif os.path.basename(self.input_source) == 'satellite_1.png':
                 gt_data = ['Weapons', 'Hanger', 'Fuel', 'Missiles']
             elif os.path.basename(self.input_source) == 'satellite_2.png':
@@ -1096,6 +1106,45 @@ class BinaryDecoderPopup(BasePopup):
                 self.image.texture = texture
 
 
+class ArtisticFiltersPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(ArtisticFiltersPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Artistic Filters"
+
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        Clock.schedule_interval(self.process_image, process_interval_sec)
+
+        self.frame_count = 0
+
+    def process_image(self, dt, *args):
+
+        frame = self.get_latest_frame()
+        if frame is None:
+            return
+
+        else:
+
+            # img_blur = cv2.GaussianBlur(img, (5, 5), 0, 0)
+            # img_style = cv2.stylization(img_blur, sigma_s=40, sigma_r=.1)
+
+            img_blur = cv2.GaussianBlur(frame, (5, 5), 0, 0)
+            img_sketch_bw, img_sketch_color = cv2.pencilSketch(img_blur)
+
+            texture = self.convert_frame_to_texture(img_sketch_color)
+            self.image.texture = texture
+
+
 class ObjectDetectionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
@@ -1126,15 +1175,18 @@ class ObjectDetectionPopup(BasePopup):
 
         self.num_threads = 4
 
-        np.random.seed(2000)
-        self.COLORS = np.random.uniform(0, 255, size=(200, 3))
+        R = np.array(np.arange(44., 200., 26.))
+        G = np.roll(R, 1)
+        B = np.roll(R, 2)
+
+        self.COLORS = np.array(np.meshgrid(R, G, B)).T.reshape(-1, 3)
 
     def visualize(self, image: np.ndarray, detection_result: processor.DetectionResult) -> np.ndarray:
         """Draws bounding boxes on the input image and return it.
 
         Args:
           image: The input RGB image.
-          detection_result: The list of all "Detection" entities to be visualize.
+          detection_result: The list of all "Detection" entities to be visualized.
 
         Returns:
           Image with bounding boxes.
