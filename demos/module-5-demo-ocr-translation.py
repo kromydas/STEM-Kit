@@ -26,6 +26,7 @@
 # Developed by Big Vision LLC for Emerging Technologies Institute (ETI).
 #------------------------------------------------------------------------------
 
+import os
 import cv2
 import numpy as np
 import googletrans
@@ -83,7 +84,7 @@ def fourPointsTransform(frame, vertices):
     result = cv2.warpPerspective(frame, rotationMatrix, outputSize)
     return result
 
-def recognizeTranslateText(image, dest='en', src=''):
+def recognizeTranslateText(image, gt_data=None, dest='en', src=None):
     """
     # Perform Language Translation on Recognized Text.
     :param image: Input image frame.
@@ -94,6 +95,11 @@ def recognizeTranslateText(image, dest='en', src=''):
     # Use the DB text detector initialized previously to detect the presence of text in the image.
     boxes, confs = textDetector.detect(image)
 
+    if boxes is not None:
+        # Draw the bounding boxes of text detected.
+        cv2.polylines(image, boxes, True, (255, 0, 255), 3)
+
+    idx = 0
     # Process each detected text block.
     for box in boxes:
 
@@ -104,31 +110,32 @@ def recognizeTranslateText(image, dest='en', src=''):
         recognizedText = textRecognizer.recognize(croppedRoi)
 
         if recognizedText is not None and recognizedText.strip() != '':
-            if src:
-                translation = translator.translate(recognizedText, dest, src)
+            if gt_data is not None:
+                translation = gt_data[idx]
             else:
-                translation = translator.translate(recognizedText, dest)
-        else:
-            print("No text was recognized in the frame.")
+                if src is not None:
+                    translation = translator.translate(recognizedText, dest, src)
+                else:
+                    translation = translator.translate(recognizedText, dest)
 
-        # Coordinates text annotation.
-        pad_x = 10
-        shift_y = 10
-        px = int(np.max(box[0:4,0])) + pad_x
-        py = int(np.average(box[0:4,1])) + shift_y
-        lower_left = (px, py)
-
-        draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
-                          fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
-
-    # Draw the bounding boxes of text detected.
-    cv2.polylines(image, boxes, True, (255, 0, 255), 3)
-
+            if translation is not None:
+                pad_x = 10
+                shift_y = 10
+                px = int(np.max(box[0:4,0])) + pad_x
+                py = int(np.average(box[0:4,1])) + shift_y
+                lower_left = (px, py)
+                if gt_data is not None:
+                    # Use hard-coded values.
+                    draw_label_banner_ocr(image, translation, lower_left, font_color=(255, 255, 255),
+                                    fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+                else:
+                    # Use translation from Google API.
+                    draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
+                                          fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
+        idx+=1
     return image
 
 if __name__ == "__main__":
-
-    #print(googletrans.LANGUAGES)
 
     # Create a Translator Object.
     translator = googletrans.Translator()
@@ -172,7 +179,7 @@ if __name__ == "__main__":
     polyThresh = 0.5
 
     mean = (122.67891434, 116.66876762, 104.00698793)
-    inputSize = (480, 480)
+    inputSize = (480, 320)
 
     textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
     textDetector.setInputParams(1.0/255, inputSize, mean, True)
@@ -186,14 +193,27 @@ if __name__ == "__main__":
     source = args['image']
     ip_image = cv2.imread(source)
 
-    frame = ip_image.copy()
-    frame = cv2.resize(frame, inputSize)
+    frame = cv2.resize(ip_image, inputSize)
 
     cv2.imshow("Input", frame)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    gt_data = None
 
-    ocr_result = recognizeTranslateText(frame)
+    # ----------------------------------------------------------------------
+    # Special operating mode that by-passes the Google Translation API
+    # intentionally since that (free) service is not 100% reliable for
+    # returning valid data due to usage limitations.
+    # ----------------------------------------------------------------------
+    use_ground_truth = True
+    if use_ground_truth:
+        # Assign translation values based on the input image names.
+        if os.path.basename(source) == 'foreign_text.png':
+            gt_data = ['Good morning', 'Good morning', 'Good morning', 'Good morning', 'Good morning']
+        else:
+            gt_data = ['Failed translation look-up.']
+
+    ocr_result = recognizeTranslateText(frame, gt_data=gt_data)
 
     cv2.imshow('OCR Translation Result', ocr_result)
 
