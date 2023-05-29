@@ -11,14 +11,14 @@ os.environ["KIVY_NO_ARGS"] = "1"
 import sys
 import numpy as np
 import cv2
-import pyzbar.pyzbar as pyzbar
+# import pyzbar.pyzbar as pyzbar
 import onnxruntime
 import googletrans
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
-from tflite_support.task import core
-from tflite_support.task import processor
-from tflite_support.task import vision
+# from tflite_support.task import core
+# from tflite_support.task import processor
+# from tflite_support.task import vision
 
 import kivy
 from kivy.clock import Clock
@@ -28,6 +28,8 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.slider import Slider
 from kivy.uix.button import Button
+from kivy.uix.checkbox import CheckBox
+from kivy.graphics import Color, Ellipse
 from kivy.uix.image import Image
 from kivy.uix.popup import Popup
 from kivy.uix.label import Label
@@ -153,6 +155,20 @@ def draw_label_banner(frame, text, centroid, font_color=(0, 0, 0), fill_color=(2
     cv2.putText(frame, text, (px, py), cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_color, font_thickness,
                 cv2.LINE_AA)
 
+class CustomCheckBox(CheckBox):
+    def __init__(self, **kwargs):
+        super(CustomCheckBox, self).__init__(**kwargs)
+
+        circle_diameter = 30  # Set circle diameter directly here
+
+        with self.canvas.before:
+            Color(1, 1, 1, 1)  # Set the color to white.
+            self.circle = Ellipse(size=(circle_diameter, circle_diameter))
+
+        self.bind(pos=self.update_canvas, size=self.update_canvas)
+
+    def update_canvas(self, *args):
+        self.circle.pos = (self.center_x - self.circle.size[0] / 2, self.center_y - self.circle.size[1] / 2)
 class MainLayout(BoxLayout):
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
@@ -169,10 +185,8 @@ class MainLayout(BoxLayout):
             "OCR + Translation",
             "QR Code Decoder",
             "Binary Decoder",
-            "Module 7",
-            "Module 8"
-            # "Artistic Filters",
-            # "Object Detection",
+            "Artistic Filters",
+            "Object Detection",
         ]
 
         for i in range(len(button_names)):
@@ -244,11 +258,11 @@ class MainLayout(BoxLayout):
         elif module_name == "Binary Decoder":
             popup = BinaryDecoderPopup(self)
         elif module_name == "Artistic Filters":
-            #popup = ArtisticFiltersPopup(self)
-            popup = UnderConstructionPopup(self)
+            popup = ArtisticFiltersPopup(self)
+            #popup = UnderConstructionPopup(self)
         elif module_name == "Object Detection":
-            #popup = ObjectDetectionPopup(self)
-            popup = UnderConstructionPopup(self)
+            popup = ObjectDetectionPopup(self)
+            #popup = UnderConstructionPopup(self)
         else:
             # Add additional modules here
             popup = UnderConstructionPopup(self)
@@ -335,69 +349,69 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        Clock.schedule_interval(self.process_image, process_interval_sec)
-        #Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
+        #Clock.schedule_interval(self.process_image, process_interval_sec)
+        Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
 
         self.frame_count = 0
 
-    # def process_image_cv2(self, dt, *args):
-    #
-    #     frame = self.get_latest_frame()
-    #     if frame is None:
-    #         return
-    #
-    #     else:
-    #         qcd = cv2.QRCodeDetector()
-    #
-    #         # Convert the current frame to grayscale and decode any found QR codes.
-    #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    #         found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
-    #
-    #         if found_qr_code is True:
-    #
-    #             # Outline each detected QR code.
-    #             frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
-    #
-    #             # Annotate the frame with the decoded message.
-    #             for msg, points in zip(decoded_info, points):
-    #                 centroid = find_centroid_vertices(points)
-    #                 draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
-    #                                   font_scale=font_scale, font_thickness=font_thickness)
-    #
-    #         texture = self.convert_frame_to_texture(frame)
-    #         self.image.texture = texture
-
-    def process_image(self, dt, *args):
+    def process_image_cv2(self, dt, *args):
 
         frame = self.get_latest_frame()
         if frame is None:
             return
 
         else:
-
             qcd = cv2.QRCodeDetector()
 
             # Convert the current frame to grayscale and decode any found QR codes.
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            decoded = pyzbar.decode(gray)
+            found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
 
-            for code in decoded:
-                # Extract bounding box location and size.
-                bbox = [x, y, w, h] = code.rect
+            if found_qr_code is True:
 
-                # Draw bounding box rectangle around the QR code
-                cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+                # Outline each detected QR code.
+                frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
 
-                # Get decoded text from the QR code
-                msg = code.data.decode('utf-8')
-
-                centroid = find_centroid_bbox(bbox)
-                draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
-                                  font_scale=font_scale,
-                                  font_thickness=font_thickness)
+                # Annotate the frame with the decoded message.
+                for msg, points in zip(decoded_info, points):
+                    centroid = find_centroid_vertices(points)
+                    draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+                                      font_scale=font_scale, font_thickness=font_thickness)
 
             texture = self.convert_frame_to_texture(frame)
             self.image.texture = texture
+
+    # def process_image(self, dt, *args):
+    #
+    #     frame = self.get_latest_frame()
+    #     if frame is None:
+    #         return
+    #
+    #     else:
+    #
+    #         qcd = cv2.QRCodeDetector()
+    #
+    #         # Convert the current frame to grayscale and decode any found QR codes.
+    #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    #         decoded = pyzbar.decode(gray)
+    #
+    #         for code in decoded:
+    #             # Extract bounding box location and size.
+    #             bbox = [x, y, w, h] = code.rect
+    #
+    #             # Draw bounding box rectangle around the QR code
+    #             cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+    #
+    #             # Get decoded text from the QR code
+    #             msg = code.data.decode('utf-8')
+    #
+    #             centroid = find_centroid_bbox(bbox)
+    #             draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+    #                               font_scale=font_scale,
+    #                               font_thickness=font_thickness)
+    #
+    #         texture = self.convert_frame_to_texture(frame)
+    #         self.image.texture = texture
 
 class DeblurringPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -608,9 +622,7 @@ class FaceRecognitionPopup(BasePopup):
         frame = self.get_latest_frame()
         if frame is None:
             return
-
         else:
-
             frame = cv2.resize(frame, (frameWidth, frameHeight))
 
             # --------------------------------------------------
@@ -1115,18 +1127,72 @@ class BinaryDecoderPopup(BasePopup):
                 self.image.texture = texture
 
 
+# class ArtisticFiltersPopup(BasePopup):
+#     def __init__(self, main_layout, **kwargs):
+#         super(ArtisticFiltersPopup, self).__init__(main_layout, **kwargs)
+#         self.title = "Artistic Filters"
+#
+#         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+#
+#         self.image = Image(allow_stretch=True, size_hint_y=0.7)
+#         self.content.add_widget(self.image)
+#
+#         button_layout = BoxLayout(size_hint_y=0.1)
+#         self.content.add_widget(button_layout)
+#
+#         self.close_button = Button(text="Close")
+#         self.close_button.bind(on_press=self.close_popup)
+#         button_layout.add_widget(self.close_button)
+#
+#         Clock.schedule_interval(self.process_image, process_interval_sec)
+#
+#         self.frame_count = 0
+#
+#     def process_image(self, dt, *args):
+#
+#         frame = self.get_latest_frame()
+#         if frame is None:
+#             return
+#
+#         else:
+#
+#             # img_blur = cv2.GaussianBlur(img, (5, 5), 0, 0)
+#             # img_style = cv2.stylization(img_blur, sigma_s=40, sigma_r=.1)
+#
+#             img_blur = cv2.GaussianBlur(frame, (5, 5), 0, 0)
+#             img_sketch_bw, img_sketch_color = cv2.pencilSketch(img_blur)
+#
+#             texture = self.convert_frame_to_texture(img_sketch_color)
+#             self.image.texture = texture
+
 class ArtisticFiltersPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(ArtisticFiltersPopup, self).__init__(main_layout, **kwargs)
         self.title = "Artistic Filters"
 
-        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+        self.content = BoxLayout(orientation="horizontal", spacing=layout_padding_y)
+
+        self.checkbox_layout = BoxLayout(orientation="vertical", size_hint_x=0.2)
+        self.content.add_widget(self.checkbox_layout)
+
+        self.checkbox1 = CustomCheckBox(active=True, group='radio')
+        self.checkbox_label1 = Label(text='Pencil Sketch')
+        self.checkbox_layout.add_widget(self.checkbox1)
+        self.checkbox_layout.add_widget(self.checkbox_label1)
+
+        self.checkbox2 = CustomCheckBox(active=False, group='radio')
+        self.checkbox_label2 = Label(text='Stylization')
+        self.checkbox_layout.add_widget(self.checkbox2)
+        self.checkbox_layout.add_widget(self.checkbox_label2)
+
+        self.video_content = BoxLayout(orientation="vertical", size_hint_x=0.8)
+        self.content.add_widget(self.video_content)
 
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
-        self.content.add_widget(self.image)
+        self.video_content.add_widget(self.image)
 
         button_layout = BoxLayout(size_hint_y=0.1)
-        self.content.add_widget(button_layout)
+        self.video_content.add_widget(button_layout)
 
         self.close_button = Button(text="Close")
         self.close_button.bind(on_press=self.close_popup)
@@ -1144,117 +1210,125 @@ class ArtisticFiltersPopup(BasePopup):
 
         else:
 
-            # img_blur = cv2.GaussianBlur(img, (5, 5), 0, 0)
-            # img_style = cv2.stylization(img_blur, sigma_s=40, sigma_r=.1)
+            if self.checkbox1.active:
+                img_blur = cv2.GaussianBlur(frame, (5, 5), 0, 0)
+                img_sketch_bw, img_sketch_color = cv2.pencilSketch(img_blur)
+                color = True
+                if color:
+                    frame = img_sketch_color
+                    texture = self.convert_frame_to_texture(frame)
+                else:
+                   frame = cv2.cvtColor(img_sketch_bw, cv2.COLOR_GRAY2BGR)
+                   texture = self.convert_frame_to_texture(frame)
 
-            img_blur = cv2.GaussianBlur(frame, (5, 5), 0, 0)
-            img_sketch_bw, img_sketch_color = cv2.pencilSketch(img_blur)
+            else:
+                img_blur = cv2.GaussianBlur(frame, (9, 9), 0, 0)
+                frame = cv2.stylization(img_blur, sigma_s=60, sigma_r=.3)
+                texture = self.convert_frame_to_texture(frame)
 
-            texture = self.convert_frame_to_texture(img_sketch_color)
             self.image.texture = texture
 
-
-class ObjectDetectionPopup(BasePopup):
-    def __init__(self, main_layout, **kwargs):
-        super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
-        self.title = "Object Detection"
-
-        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-
-        self.image = Image(allow_stretch=True, size_hint_y=0.7)
-        self.content.add_widget(self.image)
-
-        button_layout = BoxLayout(size_hint_y=0.1)
-        self.content.add_widget(button_layout)
-
-        self.close_button = Button(text="Close")
-        self.close_button.bind(on_press=self.close_popup)
-        button_layout.add_widget(self.close_button)
-
-        Clock.schedule_interval(self.process_image, process_interval_sec)
-
-        self.frame_count = 0
-
-        self._MARGIN = 10  # pixels
-        self._ROW_SIZE = 10  # pixels
-        self._FONT_SIZE = 1
-        self._FONT_THICKNESS = 1
-
-        self.model = './models/efficientdet_lite0.tflite'
-
-        self.num_threads = 4
-
-        R = np.array(np.arange(44., 200., 26.))
-        G = np.roll(R, 1)
-        B = np.roll(R, 2)
-
-        self.COLORS = np.array(np.meshgrid(R, G, B)).T.reshape(-1, 3)
-
-    def visualize(self, image: np.ndarray, detection_result: processor.DetectionResult) -> np.ndarray:
-        """Draws bounding boxes on the input image and return it.
-
-        Args:
-          image: The input RGB image.
-          detection_result: The list of all "Detection" entities to be visualized.
-
-        Returns:
-          Image with bounding boxes.
-        """
-        lw = max(round(sum(image.shape) / 2 * 0.003), 2)  # Line width.
-        tf = max(lw - 1, 1)  # Font thickness.
-        for detection in detection_result.detections:
-            # Draw bounding_box
-            bbox = detection.bounding_box
-            start_point = bbox.origin_x, bbox.origin_y
-            end_point = bbox.origin_x + bbox.width, bbox.origin_y + bbox.height
-
-            # Draw label and score.
-            category = detection.categories[0]
-            color = self.COLORS[category.index]
-            cv2.rectangle(image, start_point, end_point, color, 3)
-            category_name = category.category_name
-            probability = round(category.score, 2)
-            result_text = category_name + ' (' + str(probability) + ')'
-            w, h = cv2.getTextSize(result_text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=lw / 3, thickness=tf)[
-                0]  # text width, height
-            w = int(w - (0.20 * w))
-            outside = start_point[1] - h >= 3
-            p2 = start_point[0] + w, start_point[1] - h - 3 if outside else start_point[1] + h + 3
-            cv2.rectangle(image, start_point, p2, color=color, thickness=-1, lineType=cv2.LINE_AA)
-            # text_location = (_MARGIN + bbox.origin_x,_MARGIN + _ROW_SIZE + bbox.origin_y)
-            cv2.putText(image, result_text,
-                        (start_point[0], start_point[1] - 5 if outside else start_point[1] + h + 2),
-                        cv2.FONT_HERSHEY_PLAIN, self._FONT_SIZE, (255, 255, 255), self._FONT_THICKNESS)
-        return image
-    def process_image(self, dt, *args):
-
-        frame = self.get_latest_frame()
-        if frame is None:
-            return
-
-        else:
-
-            base_options = core.BaseOptions(file_name=self.model, use_coral=False, num_threads=self.num_threads)
-            detection_options = processor.DetectionOptions(max_results=3, score_threshold=0.3)
-            options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
-            detector = vision.ObjectDetector.create_from_options(options)
-
-            frame = cv2.flip(frame, 1)
-
-            # Convert the image from BGR to RGB as required by the TFLite model.
-            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # Create a TensorImage object from the RGB image.
-            input_tensor = vision.TensorImage.create_from_array(rgb_image)
-
-            # Run object detection estimation using the model.
-            detection_result = detector.detect(input_tensor)
-
-            # Draw keypoints and edges on input image
-            frame = self.visualize(frame, detection_result)
-
-            texture = self.convert_frame_to_texture(frame)
-            self.image.texture = texture
+# class ObjectDetectionPopup(BasePopup):
+#     def __init__(self, main_layout, **kwargs):
+#         super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
+#         self.title = "Object Detection"
+#
+#         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+#
+#         self.image = Image(allow_stretch=True, size_hint_y=0.7)
+#         self.content.add_widget(self.image)
+#
+#         button_layout = BoxLayout(size_hint_y=0.1)
+#         self.content.add_widget(button_layout)
+#
+#         self.close_button = Button(text="Close")
+#         self.close_button.bind(on_press=self.close_popup)
+#         button_layout.add_widget(self.close_button)
+#
+#         Clock.schedule_interval(self.process_image, process_interval_sec)
+#
+#         self.frame_count = 0
+#
+#         self._MARGIN = 10  # pixels
+#         self._ROW_SIZE = 10  # pixels
+#         self._FONT_SIZE = 1
+#         self._FONT_THICKNESS = 1
+#
+#         self.model = './models/efficientdet_lite0.tflite'
+#
+#         self.num_threads = 4
+#
+#         R = np.array(np.arange(44., 200., 26.))
+#         G = np.roll(R, 1)
+#         B = np.roll(R, 2)
+#
+#         self.COLORS = np.array(np.meshgrid(R, G, B)).T.reshape(-1, 3)
+#
+#     def visualize(self, image: np.ndarray, detection_result: processor.DetectionResult) -> np.ndarray:
+#         """Draws bounding boxes on the input image and return it.
+#
+#         Args:
+#           image: The input RGB image.
+#           detection_result: The list of all "Detection" entities to be visualized.
+#
+#         Returns:
+#           Image with bounding boxes.
+#         """
+#         lw = max(round(sum(image.shape) / 2 * 0.003), 2)  # Line width.
+#         tf = max(lw - 1, 1)  # Font thickness.
+#         for detection in detection_result.detections:
+#             # Draw bounding_box
+#             bbox = detection.bounding_box
+#             start_point = bbox.origin_x, bbox.origin_y
+#             end_point = bbox.origin_x + bbox.width, bbox.origin_y + bbox.height
+#
+#             # Draw label and score.
+#             category = detection.categories[0]
+#             color = self.COLORS[category.index]
+#             cv2.rectangle(image, start_point, end_point, color, 3)
+#             category_name = category.category_name
+#             probability = round(category.score, 2)
+#             result_text = category_name + ' (' + str(probability) + ')'
+#             w, h = cv2.getTextSize(result_text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=lw / 3, thickness=tf)[
+#                 0]  # text width, height
+#             w = int(w - (0.20 * w))
+#             outside = start_point[1] - h >= 3
+#             p2 = start_point[0] + w, start_point[1] - h - 3 if outside else start_point[1] + h + 3
+#             cv2.rectangle(image, start_point, p2, color=color, thickness=-1, lineType=cv2.LINE_AA)
+#             # text_location = (_MARGIN + bbox.origin_x,_MARGIN + _ROW_SIZE + bbox.origin_y)
+#             cv2.putText(image, result_text,
+#                         (start_point[0], start_point[1] - 5 if outside else start_point[1] + h + 2),
+#                         cv2.FONT_HERSHEY_PLAIN, self._FONT_SIZE, (255, 255, 255), self._FONT_THICKNESS)
+#         return image
+#     def process_image(self, dt, *args):
+#
+#         frame = self.get_latest_frame()
+#         if frame is None:
+#             return
+#
+#         else:
+#
+#             base_options = core.BaseOptions(file_name=self.model, use_coral=False, num_threads=self.num_threads)
+#             detection_options = processor.DetectionOptions(max_results=3, score_threshold=0.3)
+#             options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
+#             detector = vision.ObjectDetector.create_from_options(options)
+#
+#             frame = cv2.flip(frame, 1)
+#
+#             # Convert the image from BGR to RGB as required by the TFLite model.
+#             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#
+#             # Create a TensorImage object from the RGB image.
+#             input_tensor = vision.TensorImage.create_from_array(rgb_image)
+#
+#             # Run object detection estimation using the model.
+#             detection_result = detector.detect(input_tensor)
+#
+#             # Draw keypoints and edges on input image
+#             frame = self.visualize(frame, detection_result)
+#
+#             texture = self.convert_frame_to_texture(frame)
+#             self.image.texture = texture
 
 class UnderConstructionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
