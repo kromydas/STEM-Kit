@@ -7,7 +7,7 @@
 #
 # Execute the script from the command line prompt [$] as shown below:
 #
-#    ~/demos $ python module-8-demo-object-detetcion.py
+#    ~/demos $ python module-8-demo-object-detection.py
 #
 # A window will be displayed with the video stream from a connected camera
 # and each frame will be annotated with object detection results which includes
@@ -110,7 +110,7 @@ def run(model: str, camera_id: int, width: int, height: int,  num_threads: int, 
   options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
   detector = vision.ObjectDetector.create_from_options(options)
 
-  # Continuously capture images from the camera and run inference
+  # Continuously capture images from the camera and run inference.
   while cap.isOpened():
     success, image = cap.read()
     if not success:
@@ -128,7 +128,7 @@ def run(model: str, camera_id: int, width: int, height: int,  num_threads: int, 
     # Run object detection estimation using the model.
     detection_result = detector.detect(input_tensor)
 
-    # Draw keypoints and edges on input image
+    # Draw keypoints and edges on input image.
     image = visualize(image, detection_result)
 
     key = cv2.waitKey(1)

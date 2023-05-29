@@ -349,7 +349,10 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
+        # Use this version for the STEM-Kit.
         #Clock.schedule_interval(self.process_image, process_interval_sec)
+
+        # USe this version for macOS.
         Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
 
         self.frame_count = 0
@@ -1126,45 +1129,6 @@ class BinaryDecoderPopup(BasePopup):
                 texture = self.convert_frame_to_texture(frame)
                 self.image.texture = texture
 
-
-# class ArtisticFiltersPopup(BasePopup):
-#     def __init__(self, main_layout, **kwargs):
-#         super(ArtisticFiltersPopup, self).__init__(main_layout, **kwargs)
-#         self.title = "Artistic Filters"
-#
-#         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-#
-#         self.image = Image(allow_stretch=True, size_hint_y=0.7)
-#         self.content.add_widget(self.image)
-#
-#         button_layout = BoxLayout(size_hint_y=0.1)
-#         self.content.add_widget(button_layout)
-#
-#         self.close_button = Button(text="Close")
-#         self.close_button.bind(on_press=self.close_popup)
-#         button_layout.add_widget(self.close_button)
-#
-#         Clock.schedule_interval(self.process_image, process_interval_sec)
-#
-#         self.frame_count = 0
-#
-#     def process_image(self, dt, *args):
-#
-#         frame = self.get_latest_frame()
-#         if frame is None:
-#             return
-#
-#         else:
-#
-#             # img_blur = cv2.GaussianBlur(img, (5, 5), 0, 0)
-#             # img_style = cv2.stylization(img_blur, sigma_s=40, sigma_r=.1)
-#
-#             img_blur = cv2.GaussianBlur(frame, (5, 5), 0, 0)
-#             img_sketch_bw, img_sketch_color = cv2.pencilSketch(img_blur)
-#
-#             texture = self.convert_frame_to_texture(img_sketch_color)
-#             self.image.texture = texture
-
 class ArtisticFiltersPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
         super(ArtisticFiltersPopup, self).__init__(main_layout, **kwargs)
@@ -1218,8 +1182,8 @@ class ArtisticFiltersPopup(BasePopup):
                     frame = img_sketch_color
                     texture = self.convert_frame_to_texture(frame)
                 else:
-                   frame = cv2.cvtColor(img_sketch_bw, cv2.COLOR_GRAY2BGR)
-                   texture = self.convert_frame_to_texture(frame)
+                    frame = cv2.cvtColor(img_sketch_bw, cv2.COLOR_GRAY2BGR)
+                    texture = self.convert_frame_to_texture(frame)
 
             else:
                 img_blur = cv2.GaussianBlur(frame, (9, 9), 0, 0)
