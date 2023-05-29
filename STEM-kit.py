@@ -38,6 +38,7 @@ from kivy.core.window import Window
 from kivy.uix.filechooser import FileChooserIconView, FileChooserListView
 import threading
 import queue
+import argparse
 
 kivy.require("2.0.0")
 
@@ -81,9 +82,33 @@ def parse_command_line_args():
             mode = sys.argv[i + 1]
     return mode
 
+def parse_command_line_args():
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Set run mode configurations")
+
+    # Add the arguments
+    parser.add_argument('--mode', '-m',
+                        metavar='mode',
+                        type=str,
+                        default='SK',
+                        help='The mode to run the application in.')
+
+    # Add more arguments here
+    parser.add_argument('--binary_decoder', '-bd',
+                        metavar='binary_decoder',
+                        type=str,
+                        default='frame',  # or 'video'
+                        help='Prcoess single frame or video stream.')
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    return args
+
 # Set run mode configurations that appropriately scale application elements.
-mode = parse_command_line_args()
-if mode == 'SK':
+args = parse_command_line_args()
+
+if args.mode == 'SK':
     # STEM-Kit run mode (default).
     Window.left = 100  # horizontal position
     Window.top = 10  # vertical position (distance from the top of the screen)
@@ -102,6 +127,7 @@ else:
     layout_padding_y = 40
     font_size_slider = 24
     default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props'
+
 
 def check_camera():
     cap = cv2.VideoCapture(0)
@@ -997,9 +1023,13 @@ class BinaryDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        self.process_button = Button(text="Process image")
-        self.process_button.bind(on_press=self.process_image)
-        button_layout.add_widget(self.process_button)
+        if args.binary_decoder == 'frame':
+            self.process_button = Button(text="Process image")
+            self.process_button.bind(on_press=self.process_image)
+            button_layout.add_widget(self.process_button)
+        else:
+            Clock.schedule_interval(self.process_image_thread, process_interval_sec)
+            self.frame_count = 0
 
         vocabulary = []
         try:
@@ -1019,7 +1049,6 @@ class BinaryDecoderPopup(BasePopup):
 
         mean = (122.67891434, 116.66876762, 104.00698793)
         self.inputSize = (480, 480)
-        #self.inputSize = (640, 420)
 
         textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
         textDetector.setInputParams(1.0 / 255, self.inputSize, mean, True)
@@ -1076,10 +1105,6 @@ class BinaryDecoderPopup(BasePopup):
 
     def recognizeText(self, image, dest='en', src='', debug=False):
 
-        # size_x = self.inputSize[0]*.7
-        # size_y = self.inputSize[1]*.7
-
-        #image = cv2.resize(image, (size_x, size_y))
         image = cv2.resize(image, self.inputSize)
 
         # Check for presence of text on image.
@@ -1123,7 +1148,15 @@ class BinaryDecoderPopup(BasePopup):
                                            fill_color=(255, 0, 0), font_scale=1, font_thickness=2)
         return image
 
-    def process_image(self, dt, *args):
+    def process_image(self, instance):
+
+        Clock.schedule_once(self.process_image_thread, 0)
+        # if args.binary_decoder == 'frame':
+        #     Clock.schedule_once(self.process_image_thread, 0)
+        # else:
+        #     Clock.schedule_interval(self.process_image_thread, process_interval_sec)
+
+    def process_image_thread(self, dt, *args):
 
         frame = self.get_latest_frame()
         if frame is None:
@@ -1283,8 +1316,6 @@ class ObjectDetectionPopup(BasePopup):
             options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
             detector = vision.ObjectDetector.create_from_options(options)
 
-            frame = cv2.flip(frame, 1)
-
             # Convert the image from BGR to RGB as required by the TFLite model.
             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -1319,7 +1350,7 @@ class UnderConstructionPopup(BasePopup):
 
 class STEMKitv3App(App):
     def build(self):
-        if (mode == 'LT'):
+        if (args.mode == 'LT'):
             Window.size = (800, 600)
         else:
             Window.size = (620, 420)
