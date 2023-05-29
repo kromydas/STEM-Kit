@@ -12,13 +12,13 @@ import sys
 import numpy as np
 import cv2
 # import pyzbar.pyzbar as pyzbar
-import onnxruntime
+# import onnxruntime
 import googletrans
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
-# from tflite_support.task import core
-# from tflite_support.task import processor
-# from tflite_support.task import vision
+from tflite_support.task import core
+from tflite_support.task import processor
+from tflite_support.task import vision
 
 import kivy
 from kivy.clock import Clock
@@ -349,7 +349,9 @@ class QRCodeDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-        # Use this version for the STEM-Kit.
+        #----------------------------------------------------------------------
+        # *** Use this version for the STEM-Kit. ***
+        # ----------------------------------------------------------------------
         #Clock.schedule_interval(self.process_image, process_interval_sec)
 
         # USe this version for macOS.
@@ -995,6 +997,10 @@ class BinaryDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
+        self.process_button = Button(text="Process image")
+        self.process_button.bind(on_press=self.process_image)
+        button_layout.add_widget(self.process_button)
+
         vocabulary = []
         try:
             with open("./models/alphabet_01.txt") as f:
@@ -1004,10 +1010,8 @@ class BinaryDecoderPopup(BasePopup):
                     vocabulary.append(l.strip())
         except FileNotFoundError:
             print("File not found!")
-            # Handle error appropriately, maybe exit the program
         except PermissionError:
             print("No permission to read the file!")
-            # Handle error appropriately
 
         # Set threshold for Binary Map creation and polygon detection
         binThresh = 0.3
@@ -1015,6 +1019,7 @@ class BinaryDecoderPopup(BasePopup):
 
         mean = (122.67891434, 116.66876762, 104.00698793)
         self.inputSize = (480, 480)
+        #self.inputSize = (640, 420)
 
         textDetector.setBinaryThreshold(binThresh).setPolygonThreshold(polyThresh)
         textDetector.setInputParams(1.0 / 255, self.inputSize, mean, True)
@@ -1022,8 +1027,6 @@ class BinaryDecoderPopup(BasePopup):
         textRecognizer.setDecodeType("CTC-greedy")
         textRecognizer.setVocabulary(vocabulary)
         textRecognizer.setInputParams(1 / 127.5, (100, 32), (127.5, 127.5, 127.5), True)
-
-        Clock.schedule_interval(self.process_image, process_interval_ocr_sec)
 
     def binaryToDecimal(self, binary):
 
@@ -1073,6 +1076,10 @@ class BinaryDecoderPopup(BasePopup):
 
     def recognizeText(self, image, dest='en', src='', debug=False):
 
+        # size_x = self.inputSize[0]*.7
+        # size_y = self.inputSize[1]*.7
+
+        #image = cv2.resize(image, (size_x, size_y))
         image = cv2.resize(image, self.inputSize)
 
         # Check for presence of text on image.
@@ -1087,10 +1094,10 @@ class BinaryDecoderPopup(BasePopup):
 
             code = []
 
-            # Apply transformation on the detected bounding box
+            # Apply transformation on the detected bounding box.
             croppedRoi = self.fourPointsTransform(image, box)
 
-            # Recognize the text using the crnn model
+            # Recognize the text using the crnn model.
             recognizedText = textRecognizer.recognize(croppedRoi)
 
             if recognizedText is not None and recognizedText.strip() != '':
@@ -1114,7 +1121,6 @@ class BinaryDecoderPopup(BasePopup):
 
                 self.draw_label_banner_ocr(image, decoded_result, lower_left, font_color=(255, 255, 255),
                                            fill_color=(255, 0, 0), font_scale=1, font_thickness=2)
-
         return image
 
     def process_image(self, dt, *args):
@@ -1192,107 +1198,107 @@ class ArtisticFiltersPopup(BasePopup):
 
             self.image.texture = texture
 
-# class ObjectDetectionPopup(BasePopup):
-#     def __init__(self, main_layout, **kwargs):
-#         super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
-#         self.title = "Object Detection"
-#
-#         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-#
-#         self.image = Image(allow_stretch=True, size_hint_y=0.7)
-#         self.content.add_widget(self.image)
-#
-#         button_layout = BoxLayout(size_hint_y=0.1)
-#         self.content.add_widget(button_layout)
-#
-#         self.close_button = Button(text="Close")
-#         self.close_button.bind(on_press=self.close_popup)
-#         button_layout.add_widget(self.close_button)
-#
-#         Clock.schedule_interval(self.process_image, process_interval_sec)
-#
-#         self.frame_count = 0
-#
-#         self._MARGIN = 10  # pixels
-#         self._ROW_SIZE = 10  # pixels
-#         self._FONT_SIZE = 1
-#         self._FONT_THICKNESS = 1
-#
-#         self.model = './models/efficientdet_lite0.tflite'
-#
-#         self.num_threads = 4
-#
-#         R = np.array(np.arange(44., 200., 26.))
-#         G = np.roll(R, 1)
-#         B = np.roll(R, 2)
-#
-#         self.COLORS = np.array(np.meshgrid(R, G, B)).T.reshape(-1, 3)
-#
-#     def visualize(self, image: np.ndarray, detection_result: processor.DetectionResult) -> np.ndarray:
-#         """Draws bounding boxes on the input image and return it.
-#
-#         Args:
-#           image: The input RGB image.
-#           detection_result: The list of all "Detection" entities to be visualized.
-#
-#         Returns:
-#           Image with bounding boxes.
-#         """
-#         lw = max(round(sum(image.shape) / 2 * 0.003), 2)  # Line width.
-#         tf = max(lw - 1, 1)  # Font thickness.
-#         for detection in detection_result.detections:
-#             # Draw bounding_box
-#             bbox = detection.bounding_box
-#             start_point = bbox.origin_x, bbox.origin_y
-#             end_point = bbox.origin_x + bbox.width, bbox.origin_y + bbox.height
-#
-#             # Draw label and score.
-#             category = detection.categories[0]
-#             color = self.COLORS[category.index]
-#             cv2.rectangle(image, start_point, end_point, color, 3)
-#             category_name = category.category_name
-#             probability = round(category.score, 2)
-#             result_text = category_name + ' (' + str(probability) + ')'
-#             w, h = cv2.getTextSize(result_text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=lw / 3, thickness=tf)[
-#                 0]  # text width, height
-#             w = int(w - (0.20 * w))
-#             outside = start_point[1] - h >= 3
-#             p2 = start_point[0] + w, start_point[1] - h - 3 if outside else start_point[1] + h + 3
-#             cv2.rectangle(image, start_point, p2, color=color, thickness=-1, lineType=cv2.LINE_AA)
-#             # text_location = (_MARGIN + bbox.origin_x,_MARGIN + _ROW_SIZE + bbox.origin_y)
-#             cv2.putText(image, result_text,
-#                         (start_point[0], start_point[1] - 5 if outside else start_point[1] + h + 2),
-#                         cv2.FONT_HERSHEY_PLAIN, self._FONT_SIZE, (255, 255, 255), self._FONT_THICKNESS)
-#         return image
-#     def process_image(self, dt, *args):
-#
-#         frame = self.get_latest_frame()
-#         if frame is None:
-#             return
-#
-#         else:
-#
-#             base_options = core.BaseOptions(file_name=self.model, use_coral=False, num_threads=self.num_threads)
-#             detection_options = processor.DetectionOptions(max_results=3, score_threshold=0.3)
-#             options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
-#             detector = vision.ObjectDetector.create_from_options(options)
-#
-#             frame = cv2.flip(frame, 1)
-#
-#             # Convert the image from BGR to RGB as required by the TFLite model.
-#             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-#
-#             # Create a TensorImage object from the RGB image.
-#             input_tensor = vision.TensorImage.create_from_array(rgb_image)
-#
-#             # Run object detection estimation using the model.
-#             detection_result = detector.detect(input_tensor)
-#
-#             # Draw keypoints and edges on input image
-#             frame = self.visualize(frame, detection_result)
-#
-#             texture = self.convert_frame_to_texture(frame)
-#             self.image.texture = texture
+class ObjectDetectionPopup(BasePopup):
+    def __init__(self, main_layout, **kwargs):
+        super(ObjectDetectionPopup, self).__init__(main_layout, **kwargs)
+        self.title = "Object Detection"
+
+        self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
+
+        self.image = Image(allow_stretch=True, size_hint_y=0.7)
+        self.content.add_widget(self.image)
+
+        button_layout = BoxLayout(size_hint_y=0.1)
+        self.content.add_widget(button_layout)
+
+        self.close_button = Button(text="Close")
+        self.close_button.bind(on_press=self.close_popup)
+        button_layout.add_widget(self.close_button)
+
+        Clock.schedule_interval(self.process_image, process_interval_sec)
+
+        self.frame_count = 0
+
+        self._MARGIN = 10  # pixels
+        self._ROW_SIZE = 10  # pixels
+        self._FONT_SIZE = 1
+        self._FONT_THICKNESS = 1
+
+        self.model = './models/efficientdet_lite0.tflite'
+
+        self.num_threads = 4
+
+        R = np.array(np.arange(44., 200., 26.))
+        G = np.roll(R, 1)
+        B = np.roll(R, 2)
+
+        self.COLORS = np.array(np.meshgrid(R, G, B)).T.reshape(-1, 3)
+
+    def visualize(self, image: np.ndarray, detection_result: processor.DetectionResult) -> np.ndarray:
+        """Draws bounding boxes on the input image and return it.
+
+        Args:
+          image: The input RGB image.
+          detection_result: The list of all "Detection" entities to be visualized.
+
+        Returns:
+          Image with bounding boxes.
+        """
+        lw = max(round(sum(image.shape) / 2 * 0.003), 2)  # Line width.
+        tf = max(lw - 1, 1)  # Font thickness.
+        for detection in detection_result.detections:
+            # Draw bounding_box
+            bbox = detection.bounding_box
+            start_point = bbox.origin_x, bbox.origin_y
+            end_point = bbox.origin_x + bbox.width, bbox.origin_y + bbox.height
+
+            # Draw label and score.
+            category = detection.categories[0]
+            color = self.COLORS[category.index]
+            cv2.rectangle(image, start_point, end_point, color, 3)
+            category_name = category.category_name
+            probability = round(category.score, 2)
+            result_text = category_name + ' (' + str(probability) + ')'
+            w, h = cv2.getTextSize(result_text, cv2.FONT_HERSHEY_SIMPLEX, fontScale=lw / 3, thickness=tf)[
+                0]  # text width, height
+            w = int(w - (0.20 * w))
+            outside = start_point[1] - h >= 3
+            p2 = start_point[0] + w, start_point[1] - h - 3 if outside else start_point[1] + h + 3
+            cv2.rectangle(image, start_point, p2, color=color, thickness=-1, lineType=cv2.LINE_AA)
+            # text_location = (_MARGIN + bbox.origin_x,_MARGIN + _ROW_SIZE + bbox.origin_y)
+            cv2.putText(image, result_text,
+                        (start_point[0], start_point[1] - 5 if outside else start_point[1] + h + 2),
+                        cv2.FONT_HERSHEY_PLAIN, self._FONT_SIZE, (255, 255, 255), self._FONT_THICKNESS)
+        return image
+    def process_image(self, dt, *args):
+
+        frame = self.get_latest_frame()
+        if frame is None:
+            return
+
+        else:
+
+            base_options = core.BaseOptions(file_name=self.model, use_coral=False, num_threads=self.num_threads)
+            detection_options = processor.DetectionOptions(max_results=3, score_threshold=0.3)
+            options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
+            detector = vision.ObjectDetector.create_from_options(options)
+
+            frame = cv2.flip(frame, 1)
+
+            # Convert the image from BGR to RGB as required by the TFLite model.
+            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Create a TensorImage object from the RGB image.
+            input_tensor = vision.TensorImage.create_from_array(rgb_image)
+
+            # Run object detection estimation using the model.
+            detection_result = detector.detect(input_tensor)
+
+            # Draw keypoints and edges on input image
+            frame = self.visualize(frame, detection_result)
+
+            texture = self.convert_frame_to_texture(frame)
+            self.image.texture = texture
 
 class UnderConstructionPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):

@@ -9,7 +9,7 @@
 #
 # Upon execution, the script will launch a window that filters the video stream
 # to render the video with an artistic effect known as a "pencil sketch."  The
-# Pencil Sketch filter is the default, but you can also specify 
+# Pencil Sketch filter is the default, but you can also specify
 #
 # You can use the optional input argument "filter" tp specify eith
 #
