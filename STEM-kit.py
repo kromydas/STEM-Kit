@@ -469,7 +469,7 @@ class DeblurringPopup(BasePopup):
         self.load_button.bind(on_press=self.load_image)
         button_layout.add_widget(self.load_button)
 
-        self.process_button = Button(text="Process image")
+        self.process_button = Button(text="Process image", disabled=True)
         self.process_button.bind(on_press=self.process_image)
         button_layout.add_widget(self.process_button)
 
@@ -484,8 +484,9 @@ class DeblurringPopup(BasePopup):
         if len(self.filechooser.selection) > 0:
             self.input_source = self.filechooser.selection[0]
             self.image.source = self.input_source
+            self.process_button.disabled = False
 
-    # Function to visualize the Fast Fourier Transform of the blurred images.
+            # Function to visualize the Fast Fourier Transform of the blurred images.
     def create_fft(self, img):
         img = np.float32(img) / 255.0
         f = np.fft.fft2(img)
@@ -802,7 +803,7 @@ class OCRTranslationPopup(BasePopup):
         self.load_button.bind(on_press=self.load_image)
         button_layout.add_widget(self.load_button)
 
-        self.process_button = Button(text="Process image")
+        self.process_button = Button(text="Process image", disabled=True)
         self.process_button.bind(on_press=self.process_image)
         button_layout.add_widget(self.process_button)
 
@@ -848,6 +849,7 @@ class OCRTranslationPopup(BasePopup):
         if len(self.filechooser.selection) > 0:
             self.input_source = self.filechooser.selection[0]
             self.image.source = self.input_source
+            self.process_button.disabled = False
 
     def draw_label_banner_ocr(self, frame, text, lower_left, font_color=(0, 0, 0), fill_color=(255, 255, 255), font_scale=1,
                               font_thickness=1):
