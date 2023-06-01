@@ -11,7 +11,7 @@ os.environ["KIVY_NO_ARGS"] = "1"
 import sys
 import numpy as np
 import cv2
-# import pyzbar.pyzbar as pyzbar
+import pyzbar.pyzbar as pyzbar
 # import onnxruntime
 import googletrans
 from tensorflow.keras.models import load_model
@@ -285,10 +285,8 @@ class MainLayout(BoxLayout):
             popup = BinaryDecoderPopup(self)
         elif module_name == "Artistic Filters":
             popup = ArtisticFiltersPopup(self)
-            #popup = UnderConstructionPopup(self)
         elif module_name == "Object Detection":
             popup = ObjectDetectionPopup(self)
-            #popup = UnderConstructionPopup(self)
         else:
             # Add additional modules here
             popup = UnderConstructionPopup(self)
@@ -378,71 +376,71 @@ class QRCodeDecoderPopup(BasePopup):
         #----------------------------------------------------------------------
         # *** Use this version for the STEM-Kit. ***
         # ----------------------------------------------------------------------
-        #Clock.schedule_interval(self.process_image, process_interval_sec)
+        Clock.schedule_interval(self.process_image, process_interval_sec)
 
         # USe this version for macOS.
-        Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
+        #Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
 
         self.frame_count = 0
 
-    def process_image_cv2(self, dt, *args):
-
-        frame = self.get_latest_frame()
-        if frame is None:
-            return
-
-        else:
-            qcd = cv2.QRCodeDetector()
-
-            # Convert the current frame to grayscale and decode any found QR codes.
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
-
-            if found_qr_code is True:
-
-                # Outline each detected QR code.
-                frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
-
-                # Annotate the frame with the decoded message.
-                for msg, points in zip(decoded_info, points):
-                    centroid = find_centroid_vertices(points)
-                    draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
-                                      font_scale=font_scale, font_thickness=font_thickness)
-
-            texture = self.convert_frame_to_texture(frame)
-            self.image.texture = texture
-
-    # def process_image(self, dt, *args):
+    # def process_image_cv2(self, dt, *args):
     #
     #     frame = self.get_latest_frame()
     #     if frame is None:
     #         return
     #
     #     else:
-    #
     #         qcd = cv2.QRCodeDetector()
     #
     #         # Convert the current frame to grayscale and decode any found QR codes.
     #         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    #         decoded = pyzbar.decode(gray)
+    #         found_qr_code, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(gray)
     #
-    #         for code in decoded:
-    #             # Extract bounding box location and size.
-    #             bbox = [x, y, w, h] = code.rect
+    #         if found_qr_code is True:
     #
-    #             # Draw bounding box rectangle around the QR code
-    #             cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+    #             # Outline each detected QR code.
+    #             frame = cv2.polylines(frame, points.astype(int), True, (0, 255, 0), thickness=3)
     #
-    #             # Get decoded text from the QR code
-    #             msg = code.data.decode('utf-8')
-    #
-    #             centroid = find_centroid_bbox(bbox)
-    #             draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
-    #                               font_scale=font_scale,
-    #                               font_thickness=font_thickness)
+    #             # Annotate the frame with the decoded message.
+    #             for msg, points in zip(decoded_info, points):
+    #                 centroid = find_centroid_vertices(points)
+    #                 draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+    #                                   font_scale=font_scale, font_thickness=font_thickness)
     #
     #         texture = self.convert_frame_to_texture(frame)
     #         self.image.texture = texture
+
+    def process_image(self, dt, *args):
+
+        frame = self.get_latest_frame()
+        if frame is None:
+            return
+
+        else:
+
+            qcd = cv2.QRCodeDetector()
+
+            # Convert the current frame to grayscale and decode any found QR codes.
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            decoded = pyzbar.decode(gray)
+
+            for code in decoded:
+                # Extract bounding box location and size.
+                bbox = [x, y, w, h] = code.rect
+
+                # Draw bounding box rectangle around the QR code
+                cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
+
+                # Get decoded text from the QR code
+                msg = code.data.decode('utf-8')
+
+                centroid = find_centroid_bbox(bbox)
+                draw_label_banner(frame, msg, centroid, font_color=(255, 255, 255), fill_color=(255, 0, 0),
+                                  font_scale=font_scale,
+                                  font_thickness=font_thickness)
+
+            texture = self.convert_frame_to_texture(frame)
+            self.image.texture = texture
 
 class DeblurringPopup(BasePopup):
     def __init__(self, main_layout, **kwargs):
@@ -1350,7 +1348,7 @@ class UnderConstructionPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
-class STEMKitv3App(App):
+class STEMKitv4App(App):
     def build(self):
         if (args.mode == 'LT'):
             Window.size = (800, 600)
@@ -1362,4 +1360,4 @@ class STEMKitv3App(App):
         self.root.on_stop()
 
 if __name__ == "__main__":
-    STEMKitv3App().run()
+    STEMKitv4App().run()
