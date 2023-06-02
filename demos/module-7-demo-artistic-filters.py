@@ -52,7 +52,7 @@ while(True):
 
         key = cv2.waitKey(1)
         # Quit program when `q` or the `esc` key is selected.
-        if key == 32:
+        if key > 0:
             break;
 
 cv2.destroyAllWindows()
