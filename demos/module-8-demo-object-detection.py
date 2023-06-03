@@ -42,7 +42,11 @@ _ROW_SIZE = 10  # pixels
 _FONT_SIZE = 1
 _FONT_THICKNESS = 1
 
-COLORS = np.random.uniform(0, 255, size=(200, 3))
+R = np.array(np.arange(44., 200., 26.))
+G = np.roll(R, 1)
+B = np.roll(R, 2)
+
+COLORS = np.array(np.meshgrid(R, G, B)).T.reshape(-1, 3)
 
 def visualize( image: np.ndarray, detection_result: processor.DetectionResult) -> np.ndarray:
   """Draws bounding boxes on the input image and return it.
@@ -117,7 +121,6 @@ def run(model: str, camera_id: int, width: int, height: int,  num_threads: int, 
       sys.exit('ERROR: Unable to read from webcam. Please verify your webcam settings.')
 
     counter += 1
-    image = cv2.flip(image, 1)
 
     # Convert the image from BGR to RGB as required by the TFLite model.
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
