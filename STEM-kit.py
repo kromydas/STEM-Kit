@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------------------
-#
 # User Interface for STEM Kit computer vision applications.
 #
 #   Assumes supporting models are present in ./models
 #
-# Developed by Big Vision LLC for Emerging Technologies Institute (ETI).
+# Developed by Big Vision LLC on behalf of OpenCV.org for
+# Emerging Technologies Institute (ETI).
 # ------------------------------------------------------------------------------
 import os
 os.environ["KIVY_NO_ARGS"] = "1"
@@ -12,7 +12,6 @@ import sys
 import numpy as np
 import cv2
 import pyzbar.pyzbar as pyzbar
-# import onnxruntime
 import googletrans
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -43,7 +42,6 @@ import argparse
 kivy.require("2.0.0")
 
 process_interval_sec = 0.1
-process_interval_ocr_sec = 0.2
 
 #--------------------------
 # Load application models.
@@ -86,19 +84,23 @@ def parse_command_line_args():
     # Create the parser
     parser = argparse.ArgumentParser(description="Set run mode configurations")
 
-    # Add the arguments
     parser.add_argument('--mode', '-m',
+                        metavar='mode',
+                        type=str,
+                        default='demo',
+                        help='The mode to run the application in.')
+
+    parser.add_argument('--platform', '-plt',
                         metavar='mode',
                         type=str,
                         default='SK',
                         help='The mode to run the application in.')
 
-    # Add more arguments here
     parser.add_argument('--binary_decoder', '-bd',
                         metavar='binary_decoder',
                         type=str,
                         default='frame',  # or 'video'
-                        help='Prcoess single frame or video stream.')
+                        help='Process single frame or video stream.')
 
     # Parse the arguments
     args = parser.parse_args()
@@ -108,10 +110,20 @@ def parse_command_line_args():
 # Set run mode configurations that appropriately scale application elements.
 args = parse_command_line_args()
 
-if args.mode == 'SK':
+if args.mode == 'demo':
+    # Demo mode.
+    face_recognition_msg = "Matches target reference image"
+elif args.mode == 'escape':
+    # Escape room mode.
+    face_recognition_msg = 'Jack Ryan [Under Cover FBI Agent]'
+else:
+    print("Invalid run mode: use, 'demo' or 'escape'")
+    exit()
+
+if args.platform == 'SK':
     # STEM-Kit run mode (default).
     Window.left = 100  # horizontal position
-    Window.top = 10  # vertical position (distance from the top of the screen)
+    Window.top = 5  # vertical position (distance from the top of the screen)
     font_scale = 0.8
     font_thickness = 2
     layout_padding_y = 25
@@ -127,7 +139,6 @@ else:
     layout_padding_y = 40
     font_size_slider = 24
     default_media_path = '/Users/billk/dev/BigVision/ETI/STEM-Kit/Event_Props'
-
 
 def check_camera():
     cap = cv2.VideoCapture(0)
@@ -251,7 +262,6 @@ class MainLayout(BoxLayout):
     def close_app(self, instance):  # We don't use 'instance', but it's passed by Kivy so we must include it
         App.get_running_app().stop()  # Stop the currently running Kivy app
 
-
     def capture_frames(self):
 
         while True:
@@ -266,7 +276,6 @@ class MainLayout(BoxLayout):
             self.frame_queue.put(frame)
             # Reset the frame counter
             self.frame_counter = 0
-
 
     def open_module_popup(self, instance):
         module_name = instance.text
@@ -428,10 +437,10 @@ class QRCodeDecoderPopup(BasePopup):
                 # Extract bounding box location and size.
                 bbox = [x, y, w, h] = code.rect
 
-                # Draw bounding box rectangle around the QR code
+                # Draw bounding box rectangle around the QR code.
                 cv2.polylines(frame, [np.array(code.polygon)], True, (0, 255, 0), 2)
 
-                # Get decoded text from the QR code
+                # Get decoded text from the QR code.
                 msg = code.data.decode('utf-8')
 
                 centroid = find_centroid_bbox(bbox)
@@ -451,7 +460,7 @@ class DeblurringPopup(BasePopup):
                                  spacing=layout_padding_y)  # Changed orientation to "horizontal"
         self.input_source = None
 
-        # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons
+        # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons.
         self.image_and_buttons = BoxLayout(orientation="vertical", size_hint_x=0.6)
         self.image = Image(source=self.input_source, allow_stretch=True)
         self.image_and_buttons.add_widget(self.image)
@@ -484,7 +493,7 @@ class DeblurringPopup(BasePopup):
             self.image.source = self.input_source
             self.process_button.disabled = False
 
-            # Function to visualize the Fast Fourier Transform of the blurred images.
+    # Function to visualize the Fast Fourier Transform of the blurred images.
     def create_fft(self, img):
         img = np.float32(img) / 255.0
         f = np.fft.fft2(img)
@@ -704,7 +713,7 @@ class FaceRecognitionPopup(BasePopup):
                 l2_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
 
                 if l2_score <= l2_similarity_threshold:
-                    msg = 'Jack Ryan [Under Cover FBI Agent]'
+                    msg = face_recognition_msg
                     centroid = find_centroid_bbox(bbox)
                     draw_label_banner(frame, msg, centroid, font_color=(0, 255, 0), fill_color=(0, 0, 0),
                                       font_scale=font_scale, font_thickness=font_thickness)
@@ -1023,11 +1032,14 @@ class BinaryDecoderPopup(BasePopup):
         self.close_button.bind(on_press=self.close_popup)
         button_layout.add_widget(self.close_button)
 
+        # Default mode to process one frame at a time (required due to slow
+        # processing of OCR with video stream.
         if args.binary_decoder == 'frame':
             self.process_button = Button(text="Process image")
             self.process_button.bind(on_press=self.process_image)
             button_layout.add_widget(self.process_button)
         else:
+            # Experimental mode to process video stream (currently too slow).
             Clock.schedule_interval(self.process_image_thread, process_interval_sec)
             self.frame_count = 0
 

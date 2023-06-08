@@ -1,7 +1,6 @@
 #------------------------------------------------------------------------------
 #
-# Object Detection Demo (Adapted from TensorFlow tutorial examples,
-# Copyright 2021 The TensorFlow Authors. All Rights Reserved.)
+# Object Detection Demo (Adapted from TensorFlow tutorial examples).
 #
 # This script will detect various objects in the video stream.
 #
