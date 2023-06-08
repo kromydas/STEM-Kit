@@ -595,7 +595,11 @@ class FaceRecognitionPopup(BasePopup):
         # These models load fast, so ok here on start-up.
         self.face_detetcion_model = './models/face_detection_yunet_2022mar_int8.onnx'
         self.face_recognition_model = './models/face_recognition_sface_2021dec_int8.onnx'
-        self.target_image = './input_media/target_image.png'
+
+        if args.mode == 'demo':
+            self.target_image = './input_media/target_image_demo.png'
+        else:
+            self.target_image = './input_media/target_image_escape.png'
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
 
