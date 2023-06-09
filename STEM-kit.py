@@ -1,11 +1,11 @@
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # User Interface for STEM Kit computer vision applications.
 #
 #   Assumes supporting models are present in ./models
 #
 # Developed by Big Vision LLC on behalf of OpenCV.org for
 # Emerging Technologies Institute (ETI).
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 import os
 os.environ["KIVY_NO_ARGS"] = "1"
 import sys
@@ -111,7 +111,7 @@ def parse_command_line_args():
 args = parse_command_line_args()
 
 if args.mode == 'demo':
-    # Demo mode.
+    # Demo mode (default).
     face_recognition_msg = "Matches target reference image"
 elif args.mode == 'escape':
     # Escape room mode.
@@ -209,9 +209,7 @@ class CustomCheckBox(CheckBox):
 class MainLayout(BoxLayout):
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
-
         self.orientation = "vertical"
-
         self.modules_layout = GridLayout(cols=2, rows=4)
         self.add_widget(self.modules_layout)
 
@@ -266,7 +264,6 @@ class MainLayout(BoxLayout):
 
         while True:
             ret, frame = self.capture.read()
-
             if not ret:
                 break
 
@@ -297,7 +294,7 @@ class MainLayout(BoxLayout):
         elif module_name == "Object Detection":
             popup = ObjectDetectionPopup(self)
         else:
-            # Add additional modules here
+            # Add additional modules here.
             popup = UnderConstructionPopup(self)
 
         popup.open()
@@ -371,7 +368,6 @@ class QRCodeDecoderPopup(BasePopup):
         self.title = "Decode QR Code"
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
@@ -387,7 +383,7 @@ class QRCodeDecoderPopup(BasePopup):
         # ----------------------------------------------------------------------
         Clock.schedule_interval(self.process_image, process_interval_sec)
 
-        # USe this version for macOS.
+        # USe this version for macOS since pyzbar does not work on macOS.
         #Clock.schedule_interval(self.process_image_cv2, process_interval_sec)
 
         self.frame_count = 0
@@ -424,9 +420,7 @@ class QRCodeDecoderPopup(BasePopup):
         frame = self.get_latest_frame()
         if frame is None:
             return
-
         else:
-
             qcd = cv2.QRCodeDetector()
 
             # Convert the current frame to grayscale and decode any found QR codes.
@@ -653,6 +647,8 @@ class FaceRecognitionPopup(BasePopup):
             nms_threshold,
             top_k
         )
+        # There was an issue with scaling the frame, but leaving in comments
+        # for future investigation.
         # scale = 1.0
         # frameWidth = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH) * scale)
         # frameHeight = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * scale)
@@ -686,7 +682,6 @@ class FaceRecognitionPopup(BasePopup):
                 draw_label_banner(frame, msg, centroid, font_color=(255, 0, 255), fill_color=(0, 0, 0),
                                   font_scale=font_scale, font_thickness=font_thickness)
                 skip_frame = True
-
                 texture = self.convert_frame_to_texture(frame)
                 self.image.texture = texture
 
@@ -710,7 +705,6 @@ class FaceRecognitionPopup(BasePopup):
                 target_face_feature = recognizer.feature(target_face_align)
 
                 # cosine_similarity_threshold = 0.363
-                # l2_similarity_threshold = 1.128
                 l2_similarity_threshold = similarity_threshold
 
                 #cosine_score = recognizer.match(stream_face_feature, target_face_feature, cv2.FaceRecognizerSF_FR_COSINE)
@@ -798,7 +792,7 @@ class OCRTranslationPopup(BasePopup):
                                  spacing=layout_padding_y)  # Changed orientation to "horizontal"
         self.input_source = None
 
-        # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons
+        # Added a new BoxLayout with "vertical" orientation to hold the image and the buttons.
         self.image_and_buttons = BoxLayout(orientation="vertical", size_hint_x=0.6)
         self.image = Image(source=self.input_source, allow_stretch=True)
         self.image_and_buttons.add_widget(self.image)
@@ -837,10 +831,8 @@ class OCRTranslationPopup(BasePopup):
                     vocabulary.append(l.strip())
         except FileNotFoundError:
             print("File not found!")
-            # Handle error appropriately, maybe exit the program
         except PermissionError:
             print("No permission to read the file!")
-            # Handle error appropriately
 
         # Set threshold for Binary Map creation and polygon detection.
         binThresh = 0.3
@@ -954,12 +946,10 @@ class OCRTranslationPopup(BasePopup):
                         # Use hard-coded values.
                         self.draw_label_banner_ocr(image, translation, lower_left, font_color=(255, 255, 255),
                                                    fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
-
                     else:
                         # Use translation from Google API.
                         self.draw_label_banner_ocr(image, translation.text, lower_left, font_color=(255, 255, 255),
                                                    fill_color=(255, 0, 0), font_scale=0.7, font_thickness=2)
-
             idx+=1
         return image
     def process_image(self, instance):
@@ -1059,7 +1049,7 @@ class BinaryDecoderPopup(BasePopup):
         except PermissionError:
             print("No permission to read the file!")
 
-        # Set threshold for Binary Map creation and polygon detection
+        # Set threshold for Binary Map creation and polygon detection.
         binThresh = 0.3
         polyThresh = 0.5
 
@@ -1123,7 +1113,7 @@ class BinaryDecoderPopup(BasePopup):
 
         image = cv2.resize(image, self.inputSize)
 
-        # Check for presence of text on image.
+        # Check for presence of text in image.
         boxes, confs = textDetector.detect(image)
 
         if boxes is not None:
@@ -1167,6 +1157,10 @@ class BinaryDecoderPopup(BasePopup):
     def process_image(self, instance):
 
         Clock.schedule_once(self.process_image_thread, 0)
+        # Experimental option for processing a single frame or a video stream. However,
+        # the video stream processing was too slow on the STEM Kit, so the current
+        # function only processes a single frame at a time (when initiated by the user
+        # by clicking the Process Image button.
         # if args.binary_decoder == 'frame':
         #     Clock.schedule_once(self.process_image_thread, 0)
         # else:
@@ -1190,7 +1184,6 @@ class ArtisticFiltersPopup(BasePopup):
         self.title = "Artistic Filters"
 
         self.content = BoxLayout(orientation="horizontal", spacing=layout_padding_y)
-
         self.checkbox_layout = BoxLayout(orientation="vertical", size_hint_x=0.2)
         self.content.add_widget(self.checkbox_layout)
 
@@ -1226,9 +1219,7 @@ class ArtisticFiltersPopup(BasePopup):
         frame = self.get_latest_frame()
         if frame is None:
             return
-
         else:
-
             if self.checkbox1.active:
                 img_blur = cv2.GaussianBlur(frame, (5, 5), 0, 0)
                 img_sketch_bw, img_sketch_color = cv2.pencilSketch(img_blur)
@@ -1239,7 +1230,6 @@ class ArtisticFiltersPopup(BasePopup):
                 else:
                     frame = cv2.cvtColor(img_sketch_bw, cv2.COLOR_GRAY2BGR)
                     texture = self.convert_frame_to_texture(frame)
-
             else:
                 img_blur = cv2.GaussianBlur(frame, (9, 9), 0, 0)
                 frame = cv2.stylization(img_blur, sigma_s=60, sigma_r=.3)
@@ -1253,7 +1243,6 @@ class ObjectDetectionPopup(BasePopup):
         self.title = "Object Detection"
 
         self.content = BoxLayout(orientation="vertical", spacing=layout_padding_y)
-
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
@@ -1324,9 +1313,7 @@ class ObjectDetectionPopup(BasePopup):
         frame = self.get_latest_frame()
         if frame is None:
             return
-
         else:
-
             base_options = core.BaseOptions(file_name=self.model, use_coral=False, num_threads=self.num_threads)
             detection_options = processor.DetectionOptions(max_results=3, score_threshold=0.3)
             options = vision.ObjectDetectorOptions(base_options=base_options, detection_options=detection_options)
@@ -1353,7 +1340,6 @@ class UnderConstructionPopup(BasePopup):
         self.title = "Under Construction"
 
         self.content = BoxLayout(orientation="vertical", spacing=40)
-
         self.image = Image(allow_stretch=True, size_hint_y=0.7)
         self.content.add_widget(self.image)
 
